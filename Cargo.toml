@@ -1,0 +1,12 @@
+[package]
+name = "raytracer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+gl = "0.14.0"
+glfw = "0.53.0"
+cgmath = "0.18.0"
+
+[build-dependencies]
+walkdir = "2.4.0"
