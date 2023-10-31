@@ -3,7 +3,7 @@ use crate::gl_wrapper::framebuffer::Framebuffer;
 use crate::gl_wrapper::mesh::MeshBuilder;
 use crate::gl_wrapper::shader::{Shader, ShaderProgramBuilder};
 use crate::gl_wrapper::texture::Texture;
-use crate::gl_wrapper::types::{AttributeType, Primitive, ShaderType, TextureAttachment, TextureFormat};
+use crate::gl_wrapper::types::{AttributeType, Primitive, ShaderType, TextureAttachment, TextureFilter, TextureFormat};
 use crate::util::resource::Resource;
 use crate::window::window::Window;
 
@@ -42,7 +42,7 @@ fn main() {
 
     // create frame buffers
     let ray_framebuffer = Framebuffer::new();
-    let ray_dir_texture = Texture::new(window.width(), window.height(), TextureFormat::RGB32F);
+    let mut ray_dir_texture = Texture::new(window.width(), window.height(), TextureFormat::RGB32F, TextureFilter::Nearest);
 
     ray_framebuffer.attach_texture(&ray_dir_texture, TextureAttachment::Color(0));
 
@@ -81,7 +81,7 @@ fn main() {
 
         if window.resized() {
             unsafe { gl::Viewport(0, 0, window.width() as i32, window.height() as i32) }
-            // resize frame buffers
+            ray_dir_texture.resize(window.width(), window.height());
         }
 
         unsafe {
@@ -97,10 +97,7 @@ fn main() {
         // render ray data onto screen
         ray_framebuffer.unbind();
         display_program.bind();
-        unsafe {
-            gl::ActiveTexture(gl::TEXTURE0 + 0);
-            ray_dir_texture.bind();
-        }
+        ray_dir_texture.bind_to_slot(0);
         display_program.set_uniform_texture(display_program_tex_loc, 0);
         mesh.draw();
 

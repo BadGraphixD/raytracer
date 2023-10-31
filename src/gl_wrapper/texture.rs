@@ -1,4 +1,4 @@
-use crate::gl_wrapper::types::{TextureAttachment, TextureFormat};
+use crate::gl_wrapper::types::{TextureAttachment, TextureFilter, TextureFormat};
 
 fn gen_texture() -> u32 {
     let mut id: u32 = 0;
@@ -15,8 +15,14 @@ fn reformat(texture: u32, width: u32, height: u32, format: &TextureFormat) {
                        0, gl::RGB, gl::UNSIGNED_BYTE,
                        0 as *const _
         );
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
+    }
+}
+
+fn change_filter(texture: u32, filter: &TextureFilter) {
+    unsafe {
+        gl::BindTexture(gl::TEXTURE_2D, texture);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, filter.to_gl_internal() as i32);
+        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, filter.to_gl_internal() as i32);
     }
 }
 
@@ -25,13 +31,15 @@ pub struct Texture {
     width: u32,
     height: u32,
     format: TextureFormat,
+    filter: TextureFilter,
 }
 
 impl Texture {
-    pub fn new(width: u32, height: u32, format: TextureFormat) -> Self {
+    pub fn new(width: u32, height: u32, format: TextureFormat, filter: TextureFilter) -> Self {
         let texture = gen_texture();
         reformat(texture, width, height, &format);
-        Self { texture, width, height, format }
+        change_filter(texture, &filter);
+        Self { texture, width, height, format, filter }
     }
 
     pub fn bind(&self) {
@@ -39,6 +47,11 @@ impl Texture {
     }
     pub fn unbind(&self) {
         unsafe { gl::BindTexture(gl::TEXTURE_2D, 0) }
+    }
+
+    pub fn bind_to_slot(&self, slot: u32) {
+        unsafe { gl::ActiveTexture(gl::TEXTURE0 + slot); }
+        self.bind();
     }
 
     pub fn reformat(&mut self, width: u32, height: u32, format: TextureFormat) {
@@ -55,6 +68,13 @@ impl Texture {
             reformat(self.texture, width, height, &self.format);
             self.width = width;
             self.height = height;
+        }
+    }
+
+    pub fn change_filter(&mut self, filter: TextureFilter) {
+        if self.filter != filter {
+            change_filter(self.texture, &filter);
+            self.filter = filter;
         }
     }
 

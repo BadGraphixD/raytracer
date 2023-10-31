@@ -83,6 +83,21 @@ impl ShaderType {
 }
 
 #[derive(PartialEq)]
+pub enum TextureFilter {
+    Nearest,
+    Linear,
+}
+
+impl TextureFilter {
+    pub fn to_gl_internal(&self) -> u32 {
+        match self {
+            TextureFilter::Nearest => gl::NEAREST,
+            TextureFilter::Linear => gl::LINEAR,
+        }
+    }
+}
+
+#[derive(PartialEq)]
 pub enum TextureFormat {
     Depth,
     DepthStencil,
