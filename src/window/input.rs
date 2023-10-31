@@ -1,10 +1,14 @@
 use std::collections::HashMap;
 use glfw::{Key, MouseButton};
 
+fn to_axis(pos: bool, neg: bool) -> f32 {
+    pos as i32 as f32 - neg as i32 as f32
+}
+
 pub struct Input {
     keys: HashMap<Key, bool>,
     buttons: HashMap<MouseButton, bool>,
-    cursor_pos: (f64, f64),
+    cursor_pos: (f32, f32),
 }
 
 impl Input {
@@ -24,8 +28,16 @@ impl Input {
         **self.buttons.get(&button).get_or_insert(&false)
     }
 
-    pub fn cursor_pos(&self) -> (f64, f64) {
+    pub fn cursor_pos(&self) -> (f32, f32) {
         self.cursor_pos
+    }
+
+    pub fn movement(&self) -> (f32, f32, f32) {
+        (
+            to_axis(self.key_pressed(Key::D), self.key_pressed(Key::A)),
+            to_axis(self.key_pressed(Key::Space), self.key_pressed(Key::LeftShift)),
+            to_axis(self.key_pressed(Key::S), self.key_pressed(Key::W)),
+        )
     }
 
     pub fn set_key_pressed(&mut self, key: Key, pressed: bool) {
@@ -36,7 +48,7 @@ impl Input {
         self.buttons.insert(button, pressed);
     }
 
-    pub fn set_cursor_pos(&mut self, x: f64, y: f64) {
+    pub fn set_cursor_pos(&mut self, x: f32, y: f32) {
         self.cursor_pos = (x, y)
     }
 }

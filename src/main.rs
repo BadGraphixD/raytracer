@@ -1,9 +1,11 @@
+use cgmath::Vector3;
 use crate::gl_wrapper::buffer::{IndexBuffer, ShaderStorageBuffer, VertexBuffer};
 use crate::gl_wrapper::framebuffer::Framebuffer;
 use crate::gl_wrapper::mesh::MeshBuilder;
 use crate::gl_wrapper::shader::{Shader, ShaderProgramBuilder};
 use crate::gl_wrapper::texture::Texture;
 use crate::gl_wrapper::types::{AttributeType, Primitive, ShaderType, TextureAttachment, TextureFilter, TextureFormat};
+use crate::rendering::camera::Camera;
 use crate::util::resource::Resource;
 use crate::window::window::Window;
 
@@ -13,12 +15,8 @@ pub mod gl_wrapper;
 pub mod util;
 
 fn main() {
-    let mut window = match Window::new(400, 300, "Test Hello Window!") {
-        Ok(w) => w,
-        Err(_) => panic!()
-    };
-
-    // let camera = Camera::new(90.0, 0.1, 1000.0);
+    let mut window = Window::new(1000, 800, "Test Hello Window!").expect("Failed to create window!");
+    let mut camera = Camera::new_default();
 
     // load resources
     let shaders = Resource::from_relative_exe_path("res/shaders").unwrap();
@@ -26,6 +24,7 @@ fn main() {
     // create shaders
     let default_vert = Shader::new(ShaderType::VertexShader, shaders.load_cstring("default.vert").unwrap()).unwrap();
     let ray_create_frag = Shader::new(ShaderType::FragmentShader, shaders.load_cstring("ray_create.frag").unwrap()).unwrap();
+    let ray_trace_frag = Shader::new(ShaderType::FragmentShader, shaders.load_cstring("ray_trace.frag").unwrap()).unwrap();
     let display_frag = Shader::new(ShaderType::FragmentShader, shaders.load_cstring("display.frag").unwrap()).unwrap();
 
     let ray_create_program = ShaderProgramBuilder::new()
@@ -33,25 +32,39 @@ fn main() {
         .add_shader(&ray_create_frag)
         .build().unwrap();
 
+    let ray_trace_program = ShaderProgramBuilder::new()
+        .add_shader(&default_vert)
+        .add_shader(&ray_trace_frag)
+        .build().unwrap();
+
     let display_program = ShaderProgramBuilder::new()
         .add_shader(&default_vert)
         .add_shader(&display_frag)
         .build().unwrap();
 
+    let ray_create_right_loc = ray_create_program.uniform_location("right");
+    let ray_create_up_loc = ray_create_program.uniform_location("up");
+    let ray_create_front_loc = ray_create_program.uniform_location("front");
+
+    let ray_trace_dir_tex_loc = ray_trace_program.uniform_location("dirTex");
+    let ray_trace_org_loc = ray_trace_program.uniform_location("org");
+
     let display_program_tex_loc = display_program.uniform_location("display");
 
     // create frame buffers
-    let ray_framebuffer = Framebuffer::new();
+    let mut ray_dir_framebuffer = Framebuffer::new();
     let mut ray_dir_texture = Texture::new(window.width(), window.height(), TextureFormat::RGB32F, TextureFilter::Nearest);
+    ray_dir_framebuffer.attach_texture(&ray_dir_texture, TextureAttachment::Color(0));
+    ray_dir_framebuffer.bind_draw_buffers();
 
-    ray_framebuffer.attach_texture(&ray_dir_texture, TextureAttachment::Color(0));
+    ray_dir_framebuffer.check_status().expect("Framebuffer incomplete!");
 
-    unsafe {
-        let draw_buffers = [ gl::COLOR_ATTACHMENT0 ];
-        gl::DrawBuffers(1, &draw_buffers as *const u32);
-    }
+    let mut col_framebuffer = Framebuffer::new();
+    let mut col_texture = Texture::new(window.width(), window.height(), TextureFormat::RGB32F, TextureFilter::Nearest);
+    col_framebuffer.attach_texture(&col_texture, TextureAttachment::Color(0));
+    col_framebuffer.bind_draw_buffers();
 
-    ray_framebuffer.check_status().expect("Framebuffer incomplete!");
+    col_framebuffer.check_status().expect("Framebuffer incomplete!");
 
     // create buffer for drawing square
     let vertices: [f32; 8] = [
@@ -72,7 +85,7 @@ fn main() {
     ibo.buffer_data(&indices);
 
     // create buffer for storing triangle data
-    let triangleVertices: [f32; 24] = [
+    let triangle_vertices: [f32; 24] = [
         // front
         -1.0, -1.0,  1.0,
         1.0, -1.0,  1.0,
@@ -85,7 +98,7 @@ fn main() {
         -1.0,  1.0, -1.0
     ];
 
-    let triangleIndeces: [i32; 36] = [
+    let triangle_indices: [i32; 36] = [
         // front
         0, 1, 2,
         2, 3, 0,
@@ -106,11 +119,11 @@ fn main() {
         6, 7, 3,
     ];
 
-    let vertexSSBO = ShaderStorageBuffer::new();
-    let indexSSBO = ShaderStorageBuffer::new();
+    let vertex_ssbo = ShaderStorageBuffer::new();
+    let index_ssbo = ShaderStorageBuffer::new();
 
-    vertexSSBO.buffer_data(&triangleVertices);
-    indexSSBO.buffer_data(&triangleIndeces);
+    vertex_ssbo.buffer_data(&triangle_vertices);
+    index_ssbo.buffer_data(&triangle_indices);
 
     let mesh = MeshBuilder::new()
         .add_buffer(&vbo)
@@ -120,9 +133,19 @@ fn main() {
     while !window.should_close() {
         window.handle_events();
 
+        let (cursor_x, cursor_y) = window.input().cursor_pos();
+        let (move_x, move_y, move_z) = window.input().movement();
+        let dt = 0.01;
+        camera.set_rotation(
+            -(2.0 * cursor_x / window.width() as f32 - 1.0) * 8.0,
+            -(2.0 * cursor_y / window.height() as f32 - 1.0) * 8.0
+        );
+        camera.add_position(move_x * dt, move_y * dt, move_z * dt);
+
         if window.resized() {
             unsafe { gl::Viewport(0, 0, window.width() as i32, window.height() as i32) }
             ray_dir_texture.resize(window.width(), window.height());
+            col_texture.resize(window.width(), window.height());
         }
 
         unsafe {
@@ -130,15 +153,29 @@ fn main() {
             gl::Clear(gl::COLOR_BUFFER_BIT);
         }
 
-        // render ray data into frame buffer
-        ray_framebuffer.bind();
+        // create rays
+        ray_dir_framebuffer.bind();
         ray_create_program.bind();
+        let cvv = camera.generate_view_vectors(&window);
+        ray_create_program.set_uniform_3f(ray_create_right_loc, cvv.right);
+        ray_create_program.set_uniform_3f(ray_create_up_loc, cvv.up);
+        ray_create_program.set_uniform_3f(ray_create_front_loc, cvv.front);
+        mesh.draw();
+
+        // ray trace
+        col_framebuffer.bind();
+        ray_trace_program.bind();
+        ray_dir_texture.bind_to_slot(0);
+        ray_trace_program.set_uniform_texture(ray_trace_dir_tex_loc, 0);
+        ray_trace_program.set_uniform_3f(ray_trace_org_loc, cvv.pos);
+        vertex_ssbo.bind_to_slot(0);
+        index_ssbo.bind_to_slot(1);
         mesh.draw();
 
         // render ray data onto screen
-        ray_framebuffer.unbind();
+        col_framebuffer.unbind();
         display_program.bind();
-        ray_dir_texture.bind_to_slot(0);
+        col_texture.bind_to_slot(0);
         display_program.set_uniform_texture(display_program_tex_loc, 0);
         mesh.draw();
 

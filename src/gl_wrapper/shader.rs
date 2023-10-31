@@ -1,4 +1,5 @@
 use std::ffi::CString;
+use cgmath::Vector3;
 use gl::types::GLchar;
 use crate::gl_wrapper::types::ShaderType;
 use crate::util::error::ShaderError;
@@ -115,6 +116,10 @@ impl ShaderProgram {
 
     pub fn set_uniform_texture(&self, location: i32, texture: i32) {
         unsafe { gl::Uniform1i(location, texture) }
+    }
+
+    pub fn set_uniform_3f(&self, location: i32, v: Vector3<f32>) {
+        unsafe { gl::Uniform3f(location, v[0], v[1], v[2]) }
     }
 }
 

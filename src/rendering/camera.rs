@@ -1,65 +1,64 @@
-use std::ops::Add;
-use cgmath::{Deg, InnerSpace, Matrix4, Point3, Rad, Vector3};
+use std::ops::{Add, Div, Mul};
+use cgmath::{Angle, Deg, InnerSpace, Point3, Rad, Vector3, Zero};
 use crate::window::window::Window;
 
 pub struct Camera {
     fov: Rad<f32>,
-    near_plane: f32,
-    far_plane: f32,
-    up: Vector3<f32>,
 
     position: Point3<f32>,
-    pitch: Rad<f32>,
-    yaw: Rad<f32>,
+
+    up: Vector3<f32>,
+    direction: Vector3<f32>,
 }
 
 impl Camera {
-    pub fn new(fov: f32, near_plane: f32, far_plane: f32) -> Self {
-        return Camera {
-            fov: Rad::from(Deg(fov)),
-            near_plane,
-            far_plane,
-            up: Vector3::unit_y(),
-            position: Point3::new(0.0, 0.0, 0.0),
-            pitch: Rad(0.0),
-            yaw: Rad(0.0),
-        };
+    pub fn new(fov: Rad<f32>, position: Point3<f32>, up: Vector3<f32>, direction: Vector3<f32>) -> Self {
+        Self { fov, position, up, direction }
     }
 
-    pub fn set_position(&mut self, x: f32, y: f32, z: f32) {
-        self.position = Point3::new(x, y, z);
+    pub fn new_default() -> Self {
+        Self::new(
+            Rad::from(Deg(120.0)),
+            Point3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.0, 1.0, 0.0),
+            Vector3::new(1.0, 0.0, 0.0)
+        )
     }
 
     pub fn add_position(&mut self, x: f32, y: f32, z: f32) {
         self.position = self.position.add(Vector3::new(x, y, z));
     }
 
-    pub fn set_rotation(&mut self, pitch: f32, yaw: f32) {
-        self.pitch = Deg(pitch).into();
-        self.yaw = Deg(yaw).into();
+    pub fn set_rotation(&mut self, yaw: f32, pitch: f32) {
+        let pi = std::f32::consts::PI;
+        let pitch = f32::max(f32::min(pitch, pi / 2.1), -pi / 2.1);
+        let sp = pitch.sin();
+        let cp = pitch.cos();
+        let sy = yaw.sin();
+        let cy = yaw.cos();
+        self.direction = Vector3::new(cy * cp, sp, -sy * cp).normalize();
     }
 
-    pub fn calc_projection_matrix(&self, window: &Window) -> Matrix4<f32> {
-        return cgmath::perspective(
-            self.fov,
-            (window.width() / window.height()) as f32,
-            self.near_plane,
-            self.far_plane,
-        );
-    }
+    pub fn generate_view_vectors(&self, window: &Window) -> CameraViewVectors {
+        let sin_fov = self.fov.div(2.0).sin();
+        let cos_fov = self.fov.div(2.0).cos();
 
-    pub fn calc_view_matrix(&self) -> Matrix4<f32> {
-        let (sin_pitch, cos_pitch) = self.pitch.0.sin_cos();
-        let (sin_yaw, cos_yaw) = self.yaw.0.sin_cos();
+        let front  = self.direction.clone().normalize();
+        let right  = self.direction.cross(self.up).normalize();
+        let up = right.cross(self.direction).normalize();
 
-        return Matrix4::look_to_rh(
-            self.position,
-            InnerSpace::normalize(Vector3::new(
-                cos_pitch * cos_yaw,
-                sin_pitch,
-                cos_pitch * sin_yaw,
-            )),
-            self.up,
-        );
+        CameraViewVectors {
+            right: right.mul(sin_fov),
+            up: up.mul(sin_fov / window.aspect()),
+            front: front.mul(cos_fov),
+            pos: Vector3::new(self.position.x, self.position.y, self.position.z),
+        }
     }
+}
+
+pub struct CameraViewVectors {
+    pub right: Vector3<f32>,
+    pub up: Vector3<f32>,
+    pub front: Vector3<f32>,
+    pub pos: Vector3<f32>,
 }

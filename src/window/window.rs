@@ -65,7 +65,7 @@ impl Window {
                     self.input.set_button_pressed(button, action != Action::Release)
                 }
                 WindowEvent::CursorPos(x, y) => {
-                    self.input.set_cursor_pos(x, y)
+                    self.input.set_cursor_pos(x as f32, y as f32)
                 }
                 WindowEvent::Size(w, h) => {
                     let width = w as u32; let height = h as u32;
@@ -90,6 +90,7 @@ impl Window {
 
     pub fn width(&self) -> u32 { self.width }
     pub fn height(&self) -> u32 { self.height }
+    pub fn aspect(&self) -> f32 { self.width as f32 / self.height as f32 }
 
     pub fn resized(&self) -> bool { self.resized }
 }

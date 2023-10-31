@@ -3,6 +3,8 @@
 in vec2 fragPos;
 out vec3 fragCol;
 
+uniform vec3 right, up, front;
+
 void main() {
-    fragCol = vec3(fragPos, 0.0);
+    fragCol = normalize(right * fragPos.x + up * fragPos.y + front);
 }
