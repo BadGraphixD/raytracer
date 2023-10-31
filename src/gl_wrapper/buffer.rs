@@ -76,3 +76,36 @@ impl Drop for VertexBuffer {
     }
 }
 
+pub struct ShaderStorageBuffer {
+    ssbo: u32,
+}
+
+impl ShaderStorageBuffer {
+    pub fn new() -> Self {
+        Self { ssbo: gen_buffer() }
+    }
+
+    pub fn bind(&self) {
+        unsafe { gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, self.ssbo) }
+    }
+    pub fn unbind(&self) {
+        unsafe { gl::BindBuffer(gl::SHADER_STORAGE_BUFFER, 0) }
+    }
+
+    pub fn bind_to_slot(&self, slot: u32) {
+        self.bind();
+        unsafe { gl::BindBufferBase(gl::SHADER_STORAGE_BUFFER, slot, self.ssbo) }
+    }
+
+    pub fn buffer_data<T>(&self, data: &[T]) {
+        buffer_data(self.ssbo, gl::SHADER_STORAGE_BUFFER, data, gl::STATIC_DRAW);
+    }
+}
+
+impl Drop for ShaderStorageBuffer {
+    fn drop(&mut self) {
+        unsafe { gl::DeleteBuffers(1, &self.ssbo) }
+    }
+}
+
+

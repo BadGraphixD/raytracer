@@ -1,4 +1,4 @@
-use crate::gl_wrapper::buffer::{IndexBuffer, VertexBuffer};
+use crate::gl_wrapper::buffer::{IndexBuffer, ShaderStorageBuffer, VertexBuffer};
 use crate::gl_wrapper::framebuffer::Framebuffer;
 use crate::gl_wrapper::mesh::MeshBuilder;
 use crate::gl_wrapper::shader::{Shader, ShaderProgramBuilder};
@@ -53,7 +53,7 @@ fn main() {
 
     ray_framebuffer.check_status().expect("Framebuffer incomplete!");
 
-    // create objects and load into vertex buffer
+    // create buffer for drawing square
     let vertices: [f32; 8] = [
         -1.0, -1.0,
         -1.0,  1.0,
@@ -70,6 +70,47 @@ fn main() {
 
     vbo.buffer_data(&vertices);
     ibo.buffer_data(&indices);
+
+    // create buffer for storing triangle data
+    let triangleVertices: [f32; 24] = [
+        // front
+        -1.0, -1.0,  1.0,
+        1.0, -1.0,  1.0,
+        1.0,  1.0,  1.0,
+        -1.0,  1.0,  1.0,
+        // back
+        -1.0, -1.0, -1.0,
+        1.0, -1.0, -1.0,
+        1.0,  1.0, -1.0,
+        -1.0,  1.0, -1.0
+    ];
+
+    let triangleIndeces: [i32; 36] = [
+        // front
+        0, 1, 2,
+        2, 3, 0,
+        // right
+        1, 5, 6,
+        6, 2, 1,
+        // back
+        7, 6, 5,
+        5, 4, 7,
+        // left
+        4, 0, 3,
+        3, 7, 4,
+        // bottom
+        4, 5, 1,
+        1, 0, 4,
+        // top
+        3, 2, 6,
+        6, 7, 3,
+    ];
+
+    let vertexSSBO = ShaderStorageBuffer::new();
+    let indexSSBO = ShaderStorageBuffer::new();
+
+    vertexSSBO.buffer_data(&triangleVertices);
+    indexSSBO.buffer_data(&triangleIndeces);
 
     let mesh = MeshBuilder::new()
         .add_buffer(&vbo)
