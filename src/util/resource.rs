@@ -1,6 +1,5 @@
-use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::{env, ffi, fs};
+use std::{env, fs};
 use crate::util::error::ResourceError;
 
 pub struct Resource {
@@ -28,16 +27,7 @@ impl Resource {
         return path;
     }
 
-    pub fn load_cstring(&self, resource_name: &str) -> Result<ffi::CString, ResourceError> {
-        let mut file = fs::File::open(Self::resource_name_to_path(&self.root_path, resource_name))?;
-
-        let mut buffer: Vec<u8> = Vec::with_capacity(file.metadata()?.len() as usize + 1);
-        file.read_to_end(&mut buffer)?;
-
-        if buffer.iter().find(|i| **i == 0).is_some() {
-            return Err(ResourceError::FileContainsNil(resource_name.to_owned()));
-        }
-
-        return Ok(unsafe { ffi::CString::from_vec_unchecked(buffer) });
+    pub fn read_file(&self, resource_name: &str) -> Result<String, ResourceError> {
+        fs::read_to_string(Self::resource_name_to_path(&self.root_path, resource_name)).map_err(|e| ResourceError::Io(e))
     }
 }

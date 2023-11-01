@@ -1,5 +1,3 @@
-use std::fs::File;
-use std::io::BufReader;
 use crate::gl_wrapper::buffer::{IndexBuffer, ShaderStorageBuffer, VertexBuffer};
 use crate::gl_wrapper::framebuffer::Framebuffer;
 use crate::gl_wrapper::mesh::MeshBuilder;
@@ -9,7 +7,6 @@ use crate::gl_wrapper::types::{AttributeType, Primitive, ShaderType, TextureAtta
 use crate::rendering::camera::Camera;
 use crate::util::resource::Resource;
 use crate::window::window::Window;
-use obj::{load_obj, Obj};
 use crate::util::model_parser::ModelParser;
 
 pub mod window;
@@ -26,13 +23,13 @@ fn main() {
     let models = Resource::from_relative_exe_path("res/models").unwrap();
 
     // load models
-    let (model_vertices, model_indices) = ModelParser::parse(models.load_cstring("dome.obj").unwrap()).unwrap();
+    let (model_vertices, model_indices) = ModelParser::parse(models.read_file("dome.obj").unwrap()).unwrap();
 
     // create shaders
-    let default_vert = Shader::new(ShaderType::VertexShader, shaders.load_cstring("default.vert").unwrap()).unwrap();
-    let ray_create_frag = Shader::new(ShaderType::FragmentShader, shaders.load_cstring("ray_create.frag").unwrap()).unwrap();
-    let ray_trace_frag = Shader::new(ShaderType::FragmentShader, shaders.load_cstring("ray_trace.frag").unwrap()).unwrap();
-    let display_frag = Shader::new(ShaderType::FragmentShader, shaders.load_cstring("display.frag").unwrap()).unwrap();
+    let default_vert = Shader::new(ShaderType::VertexShader, shaders.read_file("default.vert").unwrap()).unwrap();
+    let ray_create_frag = Shader::new(ShaderType::FragmentShader, shaders.read_file("ray_create.frag").unwrap()).unwrap();
+    let ray_trace_frag = Shader::new(ShaderType::FragmentShader, shaders.read_file("ray_trace.frag").unwrap()).unwrap();
+    let display_frag = Shader::new(ShaderType::FragmentShader, shaders.read_file("display.frag").unwrap()).unwrap();
 
     let ray_create_program = ShaderProgramBuilder::new()
         .add_shader(&default_vert)
@@ -87,50 +84,11 @@ fn main() {
 
     let mut vbo = VertexBuffer::new();
     let mut ibo = IndexBuffer::new();
-
     vbo.buffer_data(&vertices);
     ibo.buffer_data(&indices);
 
-    // create buffer for storing triangle data
-    let triangle_vertices: [f32; 24] = [
-        // front
-        -1.0, -1.0,  1.0,
-        1.0, -1.0,  1.0,
-        1.0,  1.0,  1.0,
-        -1.0,  1.0,  1.0,
-        // back
-        -1.0, -1.0, -1.0,
-        1.0, -1.0, -1.0,
-        1.0,  1.0, -1.0,
-        -1.0,  1.0, -1.0
-    ];
-
-    let triangle_indices: [i32; 36] = [
-        // front
-        0, 1, 2,
-        2, 3, 0,
-        // right
-        1, 5, 6,
-        6, 2, 1,
-        // back
-        7, 6, 5,
-        5, 4, 7,
-        // left
-        4, 0, 3,
-        3, 7, 4,
-        // bottom
-        4, 5, 1,
-        1, 0, 4,
-        // top
-        3, 2, 6,
-        6, 7, 3,
-    ];
-
     let vertex_ssbo = ShaderStorageBuffer::new();
     let index_ssbo = ShaderStorageBuffer::new();
-
-    //vertex_ssbo.buffer_data(&triangle_vertices);
-    //index_ssbo.buffer_data(&triangle_indices);
     vertex_ssbo.buffer_data(&model_vertices);
     index_ssbo.buffer_data(&model_indices);
 
@@ -142,21 +100,25 @@ fn main() {
     while !window.should_close() {
         window.handle_events();
 
+        let dt = 0.5;
         let (cursor_x, cursor_y) = window.input().cursor_pos();
-        let (move_x, move_y, move_z) = window.input().movement();
-        let dt = 0.01;
-        camera.set_rotation(
-            -(2.0 * cursor_x / window.width() as f32 - 1.0) * 8.0,
-            -(2.0 * cursor_y / window.height() as f32 - 1.0) * 8.0
-        );
-        camera.add_position(move_x * dt, move_y * dt, move_z * dt);
+        let (input_x, input_y, input_z) = window.input().movement();
+
+        let yaw = -(2.0 * cursor_x / window.width() as f32 - 1.0) * 8.0;
+        let pitch = -(2.0 * cursor_y / window.height() as f32 - 1.0) * 8.0;
+
+        let move_x = (input_x * yaw.sin() + input_z * yaw.cos()) * dt;
+        let move_y = input_y * dt;
+        let move_z = (input_x * yaw.cos() - input_z * yaw.sin()) * dt;
+
+        camera.set_rotation(yaw, pitch);
+        camera.add_position(move_x, move_y, move_z);
 
         if window.resized() {
             unsafe { gl::Viewport(0, 0, window.width() as i32, window.height() as i32) }
             ray_dir_texture.resize(window.width(), window.height());
             col_texture.resize(window.width(), window.height());
         }
-
 
         unsafe {
             gl::ClearColor(1.0, 0.0, 1.0, 1.0);

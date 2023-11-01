@@ -36,7 +36,7 @@ impl Input {
         (
             to_axis(self.key_pressed(Key::D), self.key_pressed(Key::A)),
             to_axis(self.key_pressed(Key::Space), self.key_pressed(Key::LeftShift)),
-            to_axis(self.key_pressed(Key::S), self.key_pressed(Key::W)),
+            to_axis(self.key_pressed(Key::W), self.key_pressed(Key::S)),
         )
     }
 

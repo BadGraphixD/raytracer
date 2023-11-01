@@ -4,10 +4,11 @@ use gl::types::GLchar;
 use crate::gl_wrapper::types::ShaderType;
 use crate::util::error::ShaderError;
 
-fn create_shader(r#type: u32, source: CString) -> Result<u32, String> {
+fn create_shader(r#type: u32, source: String) -> Result<u32, String> {
     unsafe {
+        let cstr_source = CString::new(source).unwrap();
         let shader = gl::CreateShader(r#type);
-        gl::ShaderSource(shader, 1, &source.as_ptr(), std::ptr::null());
+        gl::ShaderSource(shader, 1, &cstr_source.as_ptr(), std::ptr::null());
         gl::CompileShader(shader);
         match get_shader_compile_error(shader) {
             Some(e) => Err(e),
@@ -79,7 +80,7 @@ pub struct Shader {
 }
 
 impl Shader {
-    pub fn new(r#type: ShaderType, source: CString) -> Result<Self, ShaderError> {
+    pub fn new(r#type: ShaderType, source: String) -> Result<Self, ShaderError> {
         match create_shader(r#type.to_gl_internal(), source) {
             Ok(id) => Ok(Self{ id }),
             Err(err) => Err(ShaderError::CompileError(err)),
