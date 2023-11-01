@@ -7,13 +7,13 @@ fn gen_vertex_array() -> u32 {
     id
 }
 
-pub struct Mesh {
+pub struct GeometrySet {
     vao: u32,
     draw_count: i32,
     primitives: u32,
 }
 
-impl Mesh {
+impl GeometrySet {
     fn new(draw_count: i32, primitives: u32) -> Self {
         Self { vao: gen_vertex_array(), draw_count, primitives }
     }
@@ -31,7 +31,7 @@ impl Mesh {
     }
 }
 
-impl Drop for Mesh {
+impl Drop for GeometrySet {
     fn drop(&mut self) {
         unsafe { gl::DeleteVertexArrays(1, &self.vao) }
     }
@@ -53,11 +53,11 @@ struct Buffer<'a> {
     attributes: Vec<Attribute>,
 }
 
-pub struct MeshBuilder<'a> {
+pub struct GeometrySetBuilder<'a> {
     buffers: Vec<Buffer<'a>>,
 }
 
-impl <'a>MeshBuilder<'a> {
+impl<'a> GeometrySetBuilder<'a> {
     pub fn new() -> Self {
         Self { buffers: vec![] }
     }
@@ -74,8 +74,8 @@ impl <'a>MeshBuilder<'a> {
         self
     }
 
-    pub fn build(self, indices: &IndexBuffer, primitives: Primitive) -> Mesh {
-        let mesh = Mesh::new(indices.size(), primitives.to_gl_internal());
+    pub fn build(self, indices: &IndexBuffer, primitives: Primitive) -> GeometrySet {
+        let mesh = GeometrySet::new(indices.size(), primitives.to_gl_internal());
         mesh.bind();
         indices.bind();
 
@@ -100,5 +100,30 @@ impl <'a>MeshBuilder<'a> {
         });
 
         mesh
+    }
+
+    pub fn create_square_geometry() -> (VertexBuffer, IndexBuffer, GeometrySet) {
+        const VERTICES: [f32; 8] = [
+            -1.0, -1.0,
+            -1.0,  1.0,
+            1.0,  1.0,
+            1.0, -1.0,
+        ];
+        const INDICES: [i32; 6] = [
+            0, 2, 1,
+            0, 2, 3,
+        ];
+
+        let mut vbo = VertexBuffer::new();
+        let mut ibo = IndexBuffer::new();
+        vbo.buffer_data(&VERTICES);
+        ibo.buffer_data(&INDICES);
+
+        let gs = GeometrySetBuilder::new()
+            .add_buffer(&vbo)
+            .add_attribute(2, AttributeType::Float)
+            .build(&ibo, Primitive::Triangles);
+
+        (vbo, ibo, gs)
     }
 }

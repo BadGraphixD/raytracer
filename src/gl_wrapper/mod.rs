@@ -1,5 +1,5 @@
 pub mod buffer;
-pub mod mesh;
+pub mod geometry_set;
 pub mod shader;
 pub mod types;
 pub mod framebuffer;

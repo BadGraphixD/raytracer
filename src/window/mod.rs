@@ -1,2 +1,2 @@
 pub mod window;
-mod input;
+pub mod input;
