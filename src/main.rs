@@ -26,7 +26,7 @@ fn main() {
     let models = Resource::from_relative_exe_path("res/models").unwrap();
 
     // load models
-    let (model_vertices, model_indices) = ModelParser::parse(models.load_cstring("teapot.obj").unwrap()).unwrap();
+    let (model_vertices, model_indices) = ModelParser::parse(models.load_cstring("dome.obj").unwrap()).unwrap();
 
     // create shaders
     let default_vert = Shader::new(ShaderType::VertexShader, shaders.load_cstring("default.vert").unwrap()).unwrap();
