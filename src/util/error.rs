@@ -28,3 +28,8 @@ pub enum ShaderError {
 pub enum FramebufferError {
     Error(u32),
 }
+
+#[derive(Debug)]
+pub enum ModelParseError {
+
+}

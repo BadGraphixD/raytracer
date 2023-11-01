@@ -1,5 +1,5 @@
 use std::ops::{Add, Div, Mul};
-use cgmath::{Angle, Deg, InnerSpace, Point3, Rad, Vector3, Zero};
+use cgmath::{Angle, Deg, InnerSpace, Point3, Rad, Vector3};
 use crate::window::window::Window;
 
 pub struct Camera {

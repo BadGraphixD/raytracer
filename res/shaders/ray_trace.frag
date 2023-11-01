@@ -58,7 +58,7 @@ vec3 fetchVertex(int index) {
 void main() {
     vec3 dir = texture(dirTex, (fragPos + 1) / 2).xyz;
 
-    bool collision = false;
+    int collider = -1;
     for (int i = 0; i < indices.length() / 3; i++) {
         if (intersect(
         org, dir,
@@ -66,11 +66,11 @@ void main() {
         fetchVertex(indices[i * 3 + 1]),
         fetchVertex(indices[i * 3 + 2])
         )) {
-            collision = true;
+            collider = i;
             break;
         }
     }
 
-    fragCol = collision ? vec4(1, 1, 1, 1) : vec4(dir, 1);
+    fragCol = collider == -1 ? vec4(dir, 1) : vec4((float(collider) / indices.length()), 0, 0, 1);
     //fragCol = vec4(dir, 1);
 }

@@ -1,4 +1,5 @@
-use cgmath::Vector3;
+use std::fs::File;
+use std::io::BufReader;
 use crate::gl_wrapper::buffer::{IndexBuffer, ShaderStorageBuffer, VertexBuffer};
 use crate::gl_wrapper::framebuffer::Framebuffer;
 use crate::gl_wrapper::mesh::MeshBuilder;
@@ -8,6 +9,8 @@ use crate::gl_wrapper::types::{AttributeType, Primitive, ShaderType, TextureAtta
 use crate::rendering::camera::Camera;
 use crate::util::resource::Resource;
 use crate::window::window::Window;
+use obj::{load_obj, Obj};
+use crate::util::model_parser::ModelParser;
 
 pub mod window;
 pub mod rendering;
@@ -20,6 +23,10 @@ fn main() {
 
     // load resources
     let shaders = Resource::from_relative_exe_path("res/shaders").unwrap();
+    let models = Resource::from_relative_exe_path("res/models").unwrap();
+
+    // load models
+    let (model_vertices, model_indices) = ModelParser::parse(models.load_cstring("teapot.obj").unwrap()).unwrap();
 
     // create shaders
     let default_vert = Shader::new(ShaderType::VertexShader, shaders.load_cstring("default.vert").unwrap()).unwrap();
@@ -122,8 +129,10 @@ fn main() {
     let vertex_ssbo = ShaderStorageBuffer::new();
     let index_ssbo = ShaderStorageBuffer::new();
 
-    vertex_ssbo.buffer_data(&triangle_vertices);
-    index_ssbo.buffer_data(&triangle_indices);
+    //vertex_ssbo.buffer_data(&triangle_vertices);
+    //index_ssbo.buffer_data(&triangle_indices);
+    vertex_ssbo.buffer_data(&model_vertices);
+    index_ssbo.buffer_data(&model_indices);
 
     let mesh = MeshBuilder::new()
         .add_buffer(&vbo)
@@ -147,6 +156,7 @@ fn main() {
             ray_dir_texture.resize(window.width(), window.height());
             col_texture.resize(window.width(), window.height());
         }
+
 
         unsafe {
             gl::ClearColor(1.0, 0.0, 1.0, 1.0);
