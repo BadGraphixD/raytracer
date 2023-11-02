@@ -4,6 +4,7 @@ use crate::gl_wrapper::geometry_set::GeometrySetBuilder;
 use crate::gl_wrapper::shader::{Shader, ShaderProgramBuilder};
 use crate::gl_wrapper::texture::Texture;
 use crate::gl_wrapper::types::{ShaderType, TextureAttachment, TextureFilter, TextureFormat};
+use crate::raytracing::bvh::BVHBuilder;
 use crate::rendering::camera::Camera;
 use crate::util::camera_controller::CameraController;
 use crate::util::resource::Resource;
@@ -14,6 +15,7 @@ pub mod window;
 pub mod rendering;
 pub mod gl_wrapper;
 pub mod util;
+pub mod raytracing;
 
 fn main() {
     // create window
@@ -26,7 +28,10 @@ fn main() {
     let models = Resource::from_relative_exe_path("res/models").unwrap();
 
     // load models
-    let (model_vertices, model_indices) = ModelParser::parse(models.read_file("teapot.obj").unwrap()).unwrap();
+    let (model_vertices, model_triangles) = ModelParser::parse(models.read_file("dome.obj").unwrap()).unwrap();
+    let (model_vertices, model_triangles, nodes) = BVHBuilder::new(model_vertices, model_triangles).build();
+
+    println!("{:?}", nodes);
 
     // load shaders
     let default_vert = Shader::new(ShaderType::VertexShader, shaders.read_file("default.vert").unwrap()).unwrap();
@@ -77,12 +82,12 @@ fn main() {
     let vertex_ssbo = ShaderStorageBuffer::new();
     let index_ssbo = ShaderStorageBuffer::new();
     vertex_ssbo.buffer_data(&model_vertices);
-    index_ssbo.buffer_data(&model_indices);
+    index_ssbo.buffer_data(&model_triangles);
 
     while !window.should_close() {
         // handle events
         window.handle_events();
-        camera_controller.control(&mut camera, &window, 0.01);
+        camera_controller.control(&mut camera, &window, 0.001);
 
         // todo: move everything opengl-related from here to render thread
 
