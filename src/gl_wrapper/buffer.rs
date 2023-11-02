@@ -13,7 +13,7 @@ fn buffer_data<T>(id: u32, target: u32, data: &[T], usage: u32) {
             target,
             (data.len() * std::mem::size_of::<T>()) as isize,
             &data[0] as *const T as *const c_void,
-            usage
+            usage,
         )
     }
 }
@@ -25,7 +25,10 @@ pub struct IndexBuffer {
 
 impl IndexBuffer {
     pub fn new() -> Self {
-        Self { ibo: gen_buffer(), size: 0 }
+        Self {
+            ibo: gen_buffer(),
+            size: 0,
+        }
     }
 
     pub fn bind(&self) {
@@ -40,7 +43,9 @@ impl IndexBuffer {
         self.size = data.len() as i32;
     }
 
-    pub fn size(&self) -> i32 { self.size }
+    pub fn size(&self) -> i32 {
+        self.size
+    }
 }
 
 impl Drop for IndexBuffer {
@@ -107,5 +112,3 @@ impl Drop for ShaderStorageBuffer {
         unsafe { gl::DeleteBuffers(1, &self.ssbo) }
     }
 }
-
-

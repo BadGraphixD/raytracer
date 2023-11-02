@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use glfw::{Key, MouseButton};
+use std::collections::HashMap;
 
 fn to_axis(pos: bool, neg: bool) -> f32 {
     pos as i32 as f32 - neg as i32 as f32
@@ -35,7 +35,10 @@ impl Input {
     pub fn movement(&self) -> (f32, f32, f32) {
         (
             to_axis(self.key_pressed(Key::D), self.key_pressed(Key::A)),
-            to_axis(self.key_pressed(Key::Space), self.key_pressed(Key::LeftShift)),
+            to_axis(
+                self.key_pressed(Key::Space),
+                self.key_pressed(Key::LeftShift),
+            ),
             to_axis(self.key_pressed(Key::W), self.key_pressed(Key::S)),
         )
     }

@@ -15,7 +15,11 @@ pub struct GeometrySet {
 
 impl GeometrySet {
     fn new(draw_count: i32, primitives: u32) -> Self {
-        Self { vao: gen_vertex_array(), draw_count, primitives }
+        Self {
+            vao: gen_vertex_array(),
+            draw_count,
+            primitives,
+        }
     }
 
     pub fn bind(&self) {
@@ -27,7 +31,14 @@ impl GeometrySet {
 
     pub fn draw(&self) {
         self.bind();
-        unsafe { gl::DrawElements(self.primitives, self.draw_count, gl::UNSIGNED_INT, std::ptr::null()) }
+        unsafe {
+            gl::DrawElements(
+                self.primitives,
+                self.draw_count,
+                gl::UNSIGNED_INT,
+                std::ptr::null(),
+            )
+        }
     }
 }
 
@@ -63,7 +74,10 @@ impl<'a> GeometrySetBuilder<'a> {
     }
 
     pub fn add_buffer(mut self, buffer: &'a VertexBuffer) -> Self {
-        self.buffers.push(Buffer { buffer, attributes: vec![] });
+        self.buffers.push(Buffer {
+            buffer,
+            attributes: vec![],
+        });
         self
     }
 
@@ -81,15 +95,23 @@ impl<'a> GeometrySetBuilder<'a> {
 
         let mut idx = 0;
         self.buffers.iter().for_each(|buffer| {
-            if let Some(stride) = buffer.attributes.iter().map(|attrib| attrib.size()).reduce(|acc, s| acc + s) {
+            if let Some(stride) = buffer
+                .attributes
+                .iter()
+                .map(|attrib| attrib.size())
+                .reduce(|acc, s| acc + s)
+            {
                 buffer.buffer.bind();
                 let mut offset = 0;
                 buffer.attributes.iter().for_each(|attrib| {
                     unsafe {
                         gl::VertexAttribPointer(
-                            idx, attrib.dimension,
+                            idx,
+                            attrib.dimension,
                             attrib.r#type.to_gl_internal(),
-                            gl::FALSE, stride, offset as *const _
+                            gl::FALSE,
+                            stride,
+                            offset as *const _,
                         );
                         gl::EnableVertexAttribArray(idx); // fuck this line
                     }
@@ -103,16 +125,8 @@ impl<'a> GeometrySetBuilder<'a> {
     }
 
     pub fn create_square_geometry() -> (VertexBuffer, IndexBuffer, GeometrySet) {
-        const VERTICES: [f32; 8] = [
-            -1.0, -1.0,
-            -1.0,  1.0,
-            1.0,  1.0,
-            1.0, -1.0,
-        ];
-        const INDICES: [i32; 6] = [
-            0, 2, 1,
-            0, 2, 3,
-        ];
+        const VERTICES: [f32; 8] = [-1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0, -1.0];
+        const INDICES: [i32; 6] = [0, 2, 1, 0, 2, 3];
 
         let mut vbo = VertexBuffer::new();
         let mut ibo = IndexBuffer::new();

@@ -1,6 +1,6 @@
-use std::ops::Index;
+use crate::raytracing::types::{BVHNode, Triangle, AABB};
 use cgmath::Vector3;
-use crate::raytracing::types::{AABB, BVHNode, Triangle};
+use std::ops::Index;
 
 fn centroid(tri: &Triangle, vertices: &Vec<Vector3<f32>>) -> Vector3<f32> {
     const THIRD: f32 = 1.0 / 3.0;
@@ -15,7 +15,11 @@ pub struct BVHBuilder {
 
 impl BVHBuilder {
     pub fn new(vertices: Vec<Vector3<f32>>, triangles: Vec<Triangle>) -> Self {
-        Self { vertices, triangles, nodes: vec![] }
+        Self {
+            vertices,
+            triangles,
+            nodes: vec![],
+        }
     }
 
     pub fn build(mut self) -> (Vec<Vector3<f32>>, Vec<Triangle>, Vec<BVHNode>) {
@@ -26,12 +30,15 @@ impl BVHBuilder {
 
     fn create_leaf_node(&mut self, first_triangle: i32, triangle_count: i32) {
         let mut bounds = AABB::smallest_bounds();
-        self.triangles[first_triangle as usize..(first_triangle + triangle_count) as usize].iter().for_each(|tri| {
-            bounds.include(self.vertices[tri.p0 as usize]);
-            bounds.include(self.vertices[tri.p1 as usize]);
-            bounds.include(self.vertices[tri.p2 as usize]);
-        });
-        self.nodes.push(BVHNode::new_leaf(bounds, first_triangle, triangle_count))
+        self.triangles[first_triangle as usize..(first_triangle + triangle_count) as usize]
+            .iter()
+            .for_each(|tri| {
+                bounds.include(self.vertices[tri.p0 as usize]);
+                bounds.include(self.vertices[tri.p1 as usize]);
+                bounds.include(self.vertices[tri.p2 as usize]);
+            });
+        self.nodes
+            .push(BVHNode::new_leaf(bounds, first_triangle, triangle_count))
     }
 
     fn split_leaf_node(&mut self, node_idx: usize) {
@@ -49,13 +56,19 @@ impl BVHBuilder {
         let leaf = &mut self.nodes[node_idx];
 
         // if leaf has only one triangle, leave as leaf
-        if leaf.triangle_count() <= 1 { return }
+        if leaf.triangle_count() <= 1 {
+            return;
+        }
 
         // choose axis to split on
         let size = leaf.bounds().max - leaf.bounds().min;
         let mut axis = 0;
-        if size.y > size.x { axis = 1 };
-        if size.z > *size.index(axis) { axis = 2 };
+        if size.y > size.x {
+            axis = 1
+        };
+        if size.z > *size.index(axis) {
+            axis = 2
+        };
         let split_pos = *leaf.bounds().min.index(axis) + *size.index(axis) * 0.5;
 
         // sort triangles along axis
@@ -72,7 +85,9 @@ impl BVHBuilder {
 
         // if split node would contain all or no triangles, dont split
         let left_count = i - leaf.first_triangle();
-        if left_count == 0 || left_count == leaf.triangle_count() { return }
+        if left_count == 0 || left_count == leaf.triangle_count() {
+            return;
+        }
 
         let right_child = node_count;
         let left_child = node_count + 1;

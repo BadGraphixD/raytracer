@@ -1,8 +1,8 @@
-use std::ffi::CString;
-use cgmath::Vector3;
-use gl::types::GLchar;
 use crate::gl_wrapper::types::ShaderType;
 use crate::util::error::ShaderError;
+use cgmath::Vector3;
+use gl::types::GLchar;
+use std::ffi::CString;
 
 fn create_shader(r#type: u32, source: String) -> Result<u32, String> {
     unsafe {
@@ -23,11 +23,15 @@ fn get_shader_compile_error(shader: u32) -> Option<String> {
         gl::GetShaderiv(shader, gl::COMPILE_STATUS, &mut compile_status);
 
         if compile_status != gl::TRUE as i32 {
-
             let mut info_log_length = 0;
             gl::GetShaderiv(shader, gl::INFO_LOG_LENGTH, &mut info_log_length);
             let error: CString = cstring_with_capacity(info_log_length);
-            gl::GetShaderInfoLog(shader, info_log_length, std::ptr::null_mut(), error.as_ptr() as *mut GLchar);
+            gl::GetShaderInfoLog(
+                shader,
+                info_log_length,
+                std::ptr::null_mut(),
+                error.as_ptr() as *mut GLchar,
+            );
 
             return Some(error.to_string_lossy().into_owned());
         }
@@ -57,11 +61,15 @@ fn get_program_error(program: u32, r#type: u32) -> Option<String> {
         gl::GetProgramiv(program, r#type, &mut status);
 
         if status != gl::TRUE as i32 {
-
             let mut info_log_length = 0;
             gl::GetProgramiv(program, gl::INFO_LOG_LENGTH, &mut info_log_length);
             let error: CString = cstring_with_capacity(info_log_length);
-            gl::GetProgramInfoLog(program, info_log_length, std::ptr::null_mut(), error.as_ptr() as *mut GLchar);
+            gl::GetProgramInfoLog(
+                program,
+                info_log_length,
+                std::ptr::null_mut(),
+                error.as_ptr() as *mut GLchar,
+            );
 
             return Some(error.to_string_lossy().into_owned());
         }
@@ -82,7 +90,7 @@ pub struct Shader {
 impl Shader {
     pub fn new(r#type: ShaderType, source: String) -> Result<Self, ShaderError> {
         match create_shader(r#type.to_gl_internal(), source) {
-            Ok(id) => Ok(Self{ id }),
+            Ok(id) => Ok(Self { id }),
             Err(err) => Err(ShaderError::CompileError(err)),
         }
     }
@@ -100,7 +108,9 @@ pub struct ShaderProgram {
 
 impl ShaderProgram {
     pub fn new() -> Self {
-        Self { id: unsafe { gl::CreateProgram() } }
+        Self {
+            id: unsafe { gl::CreateProgram() },
+        }
     }
 
     pub fn bind(&self) {
@@ -134,7 +144,7 @@ pub struct ShaderProgramBuilder<'a> {
     shaders: Vec<&'a Shader>,
 }
 
-impl <'a>ShaderProgramBuilder<'a> {
+impl<'a> ShaderProgramBuilder<'a> {
     pub fn new() -> Self {
         Self { shaders: vec![] }
     }
@@ -146,7 +156,9 @@ impl <'a>ShaderProgramBuilder<'a> {
 
     pub fn build(self) -> Result<ShaderProgram, ShaderError> {
         let program = ShaderProgram::new();
-        self.shaders.iter().for_each(|shader| unsafe { gl::AttachShader(program.id, shader.id) });
+        self.shaders
+            .iter()
+            .for_each(|shader| unsafe { gl::AttachShader(program.id, shader.id) });
         match link_program(program.id) {
             Ok(_) => Ok(program),
             Err(err) => Err(ShaderError::LinkError(err)),

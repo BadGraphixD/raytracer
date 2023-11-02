@@ -1,7 +1,7 @@
-use std::sync::mpsc::Receiver;
-use glfw::{Action, Context, Glfw, WindowEvent, WindowHint};
 use crate::util::error::WindowError;
 use crate::window::input::Input;
+use glfw::{Action, Context, Glfw, WindowEvent, WindowHint};
+use std::sync::mpsc::Receiver;
 
 pub struct Window {
     glfw: Glfw,
@@ -21,10 +21,11 @@ impl Window {
             Err(_) => return Err(WindowError::GlfwInitError),
         };
 
-        let (mut window, events) = match glfw.create_window(width, height, title, glfw::WindowMode::Windowed) {
-            Some(we) => we,
-            None => return Err(WindowError::CreateWindowError),
-        };
+        let (mut window, events) =
+            match glfw.create_window(width, height, title, glfw::WindowMode::Windowed) {
+                Some(we) => we,
+                None => return Err(WindowError::CreateWindowError),
+            };
 
         window.make_current();
 
@@ -42,7 +43,15 @@ impl Window {
         gl::load_with(|s| window.get_proc_address(s) as *const _);
         glfw.set_swap_interval(glfw::SwapInterval::None);
 
-        Ok(Window { glfw, window_handle: window, events, input: Input::new(), width, height, resized: false })
+        Ok(Window {
+            glfw,
+            window_handle: window,
+            events,
+            input: Input::new(),
+            width,
+            height,
+            resized: false,
+        })
     }
 
     pub fn should_close(&self) -> bool {
@@ -61,21 +70,20 @@ impl Window {
                 WindowEvent::Key(key, _, action, _) => {
                     self.input.set_key_pressed(key, action != Action::Release)
                 }
-                WindowEvent::MouseButton(button, action, _) => {
-                    self.input.set_button_pressed(button, action != Action::Release)
-                }
-                WindowEvent::CursorPos(x, y) => {
-                    self.input.set_cursor_pos(x as f32, y as f32)
-                }
+                WindowEvent::MouseButton(button, action, _) => self
+                    .input
+                    .set_button_pressed(button, action != Action::Release),
+                WindowEvent::CursorPos(x, y) => self.input.set_cursor_pos(x as f32, y as f32),
                 WindowEvent::Size(w, h) => {
-                    let width = w as u32; let height = h as u32;
+                    let width = w as u32;
+                    let height = h as u32;
                     if self.width != width || self.height != height {
                         self.width = width;
                         self.height = height;
                         self.resized = true;
                     }
                 }
-                _ => { }
+                _ => {}
             }
         }
     }
@@ -88,9 +96,17 @@ impl Window {
         &self.input
     }
 
-    pub fn width(&self) -> u32 { self.width }
-    pub fn height(&self) -> u32 { self.height }
-    pub fn aspect(&self) -> f32 { self.width as f32 / self.height as f32 }
+    pub fn width(&self) -> u32 {
+        self.width
+    }
+    pub fn height(&self) -> u32 {
+        self.height
+    }
+    pub fn aspect(&self) -> f32 {
+        self.width as f32 / self.height as f32
+    }
 
-    pub fn resized(&self) -> bool { self.resized }
+    pub fn resized(&self) -> bool {
+        self.resized
+    }
 }

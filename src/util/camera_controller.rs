@@ -8,7 +8,10 @@ pub struct CameraController {
 
 impl CameraController {
     pub fn new(movement_speed: f32, mouse_sensitivity: f32) -> Self {
-        Self { movement_speed, mouse_sensitivity }
+        Self {
+            movement_speed,
+            mouse_sensitivity,
+        }
     }
 
     pub fn control(&self, camera: &mut Camera, window: &Window, dt: f32) {

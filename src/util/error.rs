@@ -1,4 +1,3 @@
-
 #[derive(Debug)]
 pub enum WindowError {
     GlfwInitError,
@@ -30,6 +29,4 @@ pub enum FramebufferError {
 }
 
 #[derive(Debug)]
-pub enum ModelParseError {
-
-}
+pub enum ModelParseError {}

@@ -9,11 +9,16 @@ fn gen_texture() -> u32 {
 fn reformat(texture: u32, width: u32, height: u32, format: &TextureFormat) {
     unsafe {
         gl::BindTexture(gl::TEXTURE_2D, texture);
-        gl::TexImage2D(gl::TEXTURE_2D, 0,
-                       format.to_gl_internal() as i32,
-                       width as i32, height as i32,
-                       0, gl::RGB, gl::UNSIGNED_BYTE,
-                       0 as *const _
+        gl::TexImage2D(
+            gl::TEXTURE_2D,
+            0,
+            format.to_gl_internal() as i32,
+            width as i32,
+            height as i32,
+            0,
+            gl::RGB,
+            gl::UNSIGNED_BYTE,
+            0 as *const _,
         );
     }
 }
@@ -21,8 +26,16 @@ fn reformat(texture: u32, width: u32, height: u32, format: &TextureFormat) {
 fn change_filter(texture: u32, filter: &TextureFilter) {
     unsafe {
         gl::BindTexture(gl::TEXTURE_2D, texture);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, filter.to_gl_internal() as i32);
-        gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, filter.to_gl_internal() as i32);
+        gl::TexParameteri(
+            gl::TEXTURE_2D,
+            gl::TEXTURE_MIN_FILTER,
+            filter.to_gl_internal() as i32,
+        );
+        gl::TexParameteri(
+            gl::TEXTURE_2D,
+            gl::TEXTURE_MAG_FILTER,
+            filter.to_gl_internal() as i32,
+        );
     }
 }
 
@@ -39,7 +52,13 @@ impl Texture {
         let texture = gen_texture();
         reformat(texture, width, height, &format);
         change_filter(texture, &filter);
-        Self { texture, width, height, format, filter }
+        Self {
+            texture,
+            width,
+            height,
+            format,
+            filter,
+        }
     }
 
     pub fn bind(&self) {
@@ -50,7 +69,9 @@ impl Texture {
     }
 
     pub fn bind_to_slot(&self, slot: u32) {
-        unsafe { gl::ActiveTexture(gl::TEXTURE0 + slot); }
+        unsafe {
+            gl::ActiveTexture(gl::TEXTURE0 + slot);
+        }
         self.bind();
     }
 
@@ -80,7 +101,15 @@ impl Texture {
 
     pub fn attach_to_framebuffer(&self, attachment: TextureAttachment) {
         self.bind();
-        unsafe { gl::FramebufferTexture2D(gl::FRAMEBUFFER, attachment.to_gl_internal(), gl::TEXTURE_2D, self.texture, 0); }
+        unsafe {
+            gl::FramebufferTexture2D(
+                gl::FRAMEBUFFER,
+                attachment.to_gl_internal(),
+                gl::TEXTURE_2D,
+                self.texture,
+                0,
+            );
+        }
     }
 }
 

@@ -39,7 +39,7 @@ impl AABB {
 #[derive(Debug)]
 pub struct BVHNode {
     bounds: AABB,
-    is_leaf: bool,
+    is_leaf: u32,
 
     // can hold either:     right_node, left_node
     // or:                  first_triangle, triangle_count
@@ -49,25 +49,47 @@ pub struct BVHNode {
 
 impl BVHNode {
     pub fn new_node(bounds: AABB, right_node: i32, left_node: i32) -> Self {
-        Self { bounds, is_leaf: false, a: right_node, b: left_node }
+        Self {
+            bounds,
+            is_leaf: 0,
+            a: right_node,
+            b: left_node,
+        }
     }
 
     pub fn new_leaf(bounds: AABB, first_triangle: i32, triangle_count: i32) -> Self {
-        Self { bounds, is_leaf: true, a: first_triangle, b: triangle_count }
+        Self {
+            bounds,
+            is_leaf: 1,
+            a: first_triangle,
+            b: triangle_count,
+        }
     }
 
     pub fn convert_to_node(&mut self, right_node: i32, left_node: i32) {
-        self.is_leaf = false;
+        self.is_leaf = 0;
         self.a = right_node;
         self.b = left_node;
     }
 
-    pub fn bounds(&self) -> &AABB { &self.bounds }
-    pub fn is_leaf(&self) -> bool { self.is_leaf }
+    pub fn bounds(&self) -> &AABB {
+        &self.bounds
+    }
+    pub fn is_leaf(&self) -> bool {
+        self.is_leaf != 0
+    }
 
-    pub fn right_node(&self) -> i32 { self.a }
-    pub fn left_node(&self) -> i32 { self.b }
+    pub fn right_node(&self) -> i32 {
+        self.a
+    }
+    pub fn left_node(&self) -> i32 {
+        self.b
+    }
 
-    pub fn first_triangle(&self) -> i32 { self.a }
-    pub fn triangle_count(&self) -> i32 { self.b }
+    pub fn first_triangle(&self) -> i32 {
+        self.a
+    }
+    pub fn triangle_count(&self) -> i32 {
+        self.b
+    }
 }

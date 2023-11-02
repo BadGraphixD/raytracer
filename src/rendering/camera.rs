@@ -1,6 +1,6 @@
-use std::ops::{Add, Div, Mul};
-use cgmath::{Angle, Deg, InnerSpace, Point3, Rad, Vector3};
 use crate::window::window::Window;
+use cgmath::{Angle, Deg, InnerSpace, Point3, Rad, Vector3};
+use std::ops::{Add, Div, Mul};
 
 pub struct Camera {
     fov: Rad<f32>,
@@ -12,8 +12,18 @@ pub struct Camera {
 }
 
 impl Camera {
-    pub fn new(fov: Rad<f32>, position: Point3<f32>, up: Vector3<f32>, direction: Vector3<f32>) -> Self {
-        Self { fov, position, up, direction }
+    pub fn new(
+        fov: Rad<f32>,
+        position: Point3<f32>,
+        up: Vector3<f32>,
+        direction: Vector3<f32>,
+    ) -> Self {
+        Self {
+            fov,
+            position,
+            up,
+            direction,
+        }
     }
 
     pub fn new_default() -> Self {
@@ -21,7 +31,7 @@ impl Camera {
             Rad::from(Deg(120.0)),
             Point3::new(0.0, 0.0, 0.0),
             Vector3::new(0.0, 1.0, 0.0),
-            Vector3::new(1.0, 0.0, 0.0)
+            Vector3::new(1.0, 0.0, 0.0),
         )
     }
 
@@ -43,8 +53,8 @@ impl Camera {
         let sin_fov = self.fov.div(2.0).sin();
         let cos_fov = self.fov.div(2.0).cos();
 
-        let front  = self.direction.clone().normalize();
-        let right  = self.direction.cross(self.up).normalize();
+        let front = self.direction.clone().normalize();
+        let right = self.direction.cross(self.up).normalize();
         let up = right.cross(self.direction).normalize();
 
         CameraViewVectors {
