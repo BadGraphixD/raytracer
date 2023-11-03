@@ -1,4 +1,4 @@
-use cgmath::{Array, Vector3};
+use cgmath::{Vector3, Zero};
 
 pub struct Triangle {
     pub p0: u32,
@@ -22,11 +22,7 @@ impl AABB {
     pub fn new(min: Vector3<f32>, max: Vector3<f32>) -> Self {
         Self { min, max }
     }
-    pub fn smallest_bounds() -> Self {
-        // Values squared must fit into f32, so that area of smallest box will not be NaN
-        Self::new(Vector3::from_value(1e16), Vector3::from_value(-1e16))
-    }
-    pub fn include(&mut self, point: Vector3<f32>) {
+    pub fn include(&mut self, point: &Vector3<f32>) {
         self.min.x = f32::min(self.min.x, point.x);
         self.min.y = f32::min(self.min.y, point.y);
         self.min.z = f32::min(self.min.z, point.z);
@@ -38,6 +34,34 @@ impl AABB {
     pub fn area(&self) -> f32 {
         let e = self.max - self.min;
         e.x * e.y + e.y * e.z + e.z * e.x
+    }
+}
+
+pub struct AABBBuilder {
+    aabb: Option<AABB>,
+}
+
+impl AABBBuilder {
+    pub fn new() -> Self {
+        Self { aabb: None }
+    }
+    pub fn include(&mut self, point: &Vector3<f32>) {
+        match &mut self.aabb {
+            None => self.aabb = Some(AABB::new(point.clone(), point.clone())),
+            Some(aabb) => aabb.include(point),
+        }
+    }
+    pub fn build(self) -> AABB {
+        match self.aabb {
+            None => AABB::new(Vector3::zero(), Vector3::zero()),
+            Some(aabb) => aabb,
+        }
+    }
+    pub fn area(&self) -> f32 {
+        match &self.aabb {
+            None => 0.0,
+            Some(aabb) => aabb.area(),
+        }
     }
 }
 
@@ -53,15 +77,6 @@ pub struct BVHNode {
 }
 
 impl BVHNode {
-    pub fn new_node(bounds: AABB, right_node: u32, left_node: u32) -> Self {
-        Self {
-            bounds,
-            is_leaf: 0,
-            a: right_node,
-            b: left_node,
-        }
-    }
-
     pub fn new_leaf(bounds: AABB, first_triangle: u32, triangle_count: u32) -> Self {
         Self {
             bounds,
@@ -79,16 +94,6 @@ impl BVHNode {
 
     pub fn bounds(&self) -> &AABB {
         &self.bounds
-    }
-    pub fn is_leaf(&self) -> bool {
-        self.is_leaf != 0
-    }
-
-    pub fn right_node(&self) -> u32 {
-        self.a
-    }
-    pub fn left_node(&self) -> u32 {
-        self.b
     }
 
     pub fn first_triangle(&self) -> u32 {

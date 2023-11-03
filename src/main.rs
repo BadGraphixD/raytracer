@@ -28,7 +28,7 @@ fn main() {
     let models = Resource::from_relative_exe_path("res/models").unwrap();
 
     // load models
-    let (model_vertices, model_triangles) = ModelParser::parse(models.read_file("dragon.obj").unwrap()).unwrap();
+    let (model_vertices, model_triangles) = ModelParser::parse(models.read_file("teapot.obj").unwrap()).unwrap();
     let (model_vertices, model_triangles, model_nodes) = BVHBuilder::new(model_vertices, model_triangles).build();
 
     // load shaders
