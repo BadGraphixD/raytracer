@@ -10,7 +10,7 @@ const float EPSILON = 0.000001;
 const int NODE_STACK_SIZE = 100;
 
 struct Ray {
-    vec3 org, dir;
+    vec3 org, dir, rDir;
 };
 
 struct AABB {
@@ -46,11 +46,11 @@ layout (std430, binding = 2) buffer nodeBuffer {
 };
 
 float intersectAABB(const Ray ray, const AABB aabb, const float t) {
-    float tx1 = (aabb.minx - ray.org.x) / ray.dir.x, tx2 = (aabb.maxx - ray.org.x) / ray.dir.x;
+    float tx1 = (aabb.minx - ray.org.x) * ray.rDir.x, tx2 = (aabb.maxx - ray.org.x) * ray.rDir.x;
     float tmin = min( tx1, tx2 ), tmax = max( tx1, tx2 );
-    float ty1 = (aabb.miny - ray.org.y) / ray.dir.y, ty2 = (aabb.maxy - ray.org.y) / ray.dir.y;
+    float ty1 = (aabb.miny - ray.org.y) * ray.rDir.y, ty2 = (aabb.maxy - ray.org.y) * ray.rDir.y;
     tmin = max( tmin, min( ty1, ty2 ) ), tmax = min( tmax, max( ty1, ty2 ) );
-    float tz1 = (aabb.minz - ray.org.z) / ray.dir.z, tz2 = (aabb.maxz - ray.org.z) / ray.dir.z;
+    float tz1 = (aabb.minz - ray.org.z) * ray.rDir.z, tz2 = (aabb.maxz - ray.org.z) * ray.rDir.z;
     tmin = max( tmin, min( tz1, tz2 ) ), tmax = min( tmax, max( tz1, tz2 ) );
     return (tmax >= tmin && tmin < t && tmax > 0) ? tmin : 1e30;
     // 1e30 denotes miss
@@ -132,7 +132,7 @@ void main() {
 
     float t = 1000000;
     int intersections = 0;
-    traverseBVH(Ray(org, dir), t, intersections);
+    traverseBVH(Ray(org, dir, 1 / dir), t, intersections);
 
     fragCol = vec4(intersections / 100.0, 0, t > 1000 ? 0 : 1, 1);
     //fragCol = vec4(intersections / 100.0, 0, 0, 1);

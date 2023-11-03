@@ -11,6 +11,8 @@ pub struct Window {
     width: u32,
     height: u32,
     resized: bool,
+    prev_time: f64,
+    delta_time: f64,
 }
 
 impl Window {
@@ -44,13 +46,15 @@ impl Window {
         glfw.set_swap_interval(glfw::SwapInterval::None);
 
         Ok(Window {
-            glfw,
             window_handle: window,
             events,
             input: Input::new(),
             width,
             height,
             resized: false,
+            prev_time: glfw.get_time(),
+            delta_time: 0.01,
+            glfw,
         })
     }
 
@@ -86,6 +90,9 @@ impl Window {
                 _ => {}
             }
         }
+        let curr_time = self.glfw.get_time();
+        self.delta_time = curr_time - self.prev_time;
+        self.prev_time = curr_time;
     }
 
     pub fn update(&mut self) {
@@ -105,6 +112,7 @@ impl Window {
     pub fn aspect(&self) -> f32 {
         self.width as f32 / self.height as f32
     }
+    pub fn dt(&self) -> f32 { self.delta_time as f32 }
 
     pub fn resized(&self) -> bool {
         self.resized

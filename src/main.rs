@@ -1,3 +1,4 @@
+use std::time::SystemTime;
 use crate::gl_wrapper::buffer::ShaderStorageBuffer;
 use crate::gl_wrapper::framebuffer::Framebuffer;
 use crate::gl_wrapper::geometry_set::GeometrySetBuilder;
@@ -28,8 +29,13 @@ fn main() {
     let models = Resource::from_relative_exe_path("res/models").unwrap();
 
     // load models
-    let (model_vertices, model_triangles) = ModelParser::parse(models.read_file("teapot.obj").unwrap()).unwrap();
+    let (model_vertices, model_triangles) = ModelParser::parse(models.read_file("dragon.obj").unwrap()).unwrap();
+
+    let start = SystemTime::now();
     let (model_vertices, model_triangles, model_nodes) = BVHBuilder::new(model_vertices, model_triangles).build();
+    let end = SystemTime::now();
+    let build_time = end.duration_since(start).expect("Time measurement failed!");
+    println!("{build_time:?}");
 
     // load shaders
     let default_vert = Shader::new(
@@ -112,7 +118,7 @@ fn main() {
     while !window.should_close() {
         // handle events
         window.handle_events();
-        camera_controller.control(&mut camera, &window, 0.001);
+        camera_controller.control(&mut camera, &window, window.dt());
 
         // todo: move everything opengl-related from here to render thread
 

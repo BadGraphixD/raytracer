@@ -12,7 +12,7 @@ impl Triangle {
     }
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone)]
 pub struct AABB {
     pub min: Vector3<f32>,
     pub max: Vector3<f32>,
@@ -22,6 +22,7 @@ impl AABB {
     pub fn new(min: Vector3<f32>, max: Vector3<f32>) -> Self {
         Self { min, max }
     }
+
     pub fn include(&mut self, point: &Vector3<f32>) {
         self.min.x = f32::min(self.min.x, point.x);
         self.min.y = f32::min(self.min.y, point.y);
@@ -31,32 +32,62 @@ impl AABB {
         self.max.y = f32::max(self.max.y, point.y);
         self.max.z = f32::max(self.max.z, point.z);
     }
+
     pub fn area(&self) -> f32 {
         let e = self.max - self.min;
         e.x * e.y + e.y * e.z + e.z * e.x
     }
 }
 
+#[derive(Copy, Clone)]
+pub struct Bin {
+    pub bounds: AABBBuilder,
+    pub tri_count: u32,
+}
+
+impl Bin {
+    pub const fn new() -> Self {
+        Self {
+            bounds: AABBBuilder::new(),
+            tri_count: 0,
+        }
+    }
+}
+
+#[derive(Copy, Clone)]
 pub struct AABBBuilder {
     aabb: Option<AABB>,
 }
 
 impl AABBBuilder {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { aabb: None }
     }
+
     pub fn include(&mut self, point: &Vector3<f32>) {
         match &mut self.aabb {
             None => self.aabb = Some(AABB::new(point.clone(), point.clone())),
             Some(aabb) => aabb.include(point),
         }
     }
+
+    pub fn include_other(&mut self, other: &AABBBuilder) {
+        match other.aabb {
+            None => {}
+            Some(aabb) => {
+                self.include(&aabb.min);
+                self.include(&aabb.max);
+            }
+        }
+    }
+
     pub fn build(self) -> AABB {
         match self.aabb {
             None => AABB::new(Vector3::zero(), Vector3::zero()),
             Some(aabb) => aabb,
         }
     }
+
     pub fn area(&self) -> f32 {
         match &self.aabb {
             None => 0.0,
@@ -65,7 +96,6 @@ impl AABBBuilder {
     }
 }
 
-#[derive(Debug)]
 pub struct BVHNode {
     bounds: AABB,
     is_leaf: u32,
@@ -99,6 +129,7 @@ impl BVHNode {
     pub fn first_triangle(&self) -> u32 {
         self.a
     }
+
     pub fn triangle_count(&self) -> u32 {
         self.b
     }

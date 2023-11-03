@@ -1,5 +1,5 @@
 use std::ops::Index;
-use crate::raytracing::types::{BVHNode, Triangle, AABB, AABBBuilder};
+use crate::raytracing::types::{BVHNode, Triangle, AABB, AABBBuilder, Bin};
 use cgmath::Vector3;
 
 struct BVHTriangle {
@@ -106,6 +106,8 @@ impl BVHBuilder {
         self.nodes[node_idx].convert_to_node(right_node as u32, left_node as u32);
     }
 
+    #[deprecated]
+    #[allow(dead_code)]
     fn evaluate_split_sah(&self, node_idx: usize, axis: usize, split_pos: f32) -> f32 {
         let mut left_aabb = AABBBuilder::new();
         let mut right_aabb = AABBBuilder::new();
@@ -145,13 +147,15 @@ impl BVHBuilder {
     // first version, uses naive sah evaluation algorithm to find best split pos
     // construction time: slow O(N^2)
     // traverse time: fast
+    #[deprecated]
+    #[allow(dead_code, deprecated)]
     fn find_best_split_naive(&self, node_idx: usize, first_tri: usize, tri_count: usize) -> (usize, f32, f32) {
         let mut best_axis = 0;
         let mut best_split_pos = 0.0;
         let mut lowest_cost = 1e30;
         for axis in 0..3  {
-            for idx in first_tri..(first_tri + tri_count) {
-                let tri = self.fetch_triangle(idx);
+            for i in first_tri..(first_tri + tri_count) {
+                let tri = self.fetch_triangle(i);
                 let split_pos = tri.centroid[axis];
                 let cost = self.evaluate_split_sah(node_idx, axis, split_pos);
                 if cost < lowest_cost {
@@ -164,6 +168,11 @@ impl BVHBuilder {
         (best_axis, best_split_pos, lowest_cost)
     }
 
+    // second version, uses a fixed amount of split planes and finds best split pos
+    // construction time: medium O(N)
+    // traverse time: fast
+    #[deprecated]
+    #[allow(dead_code, deprecated)]
     fn find_best_split_step(&self, node_idx: usize, first_tri: usize, tri_count: usize) -> (usize, f32, f32) {
         const STEPS: u32 = 50;
         let mut best_axis = 0;
@@ -188,9 +197,70 @@ impl BVHBuilder {
         (best_axis, best_split_pos, lowest_cost)
     }
 
+    // third version, uses a binning system to avoid recalculating sah for every split individually
+    // construction time: fast O(N)
+    // traverse time: fast
+    fn find_best_split_binned(&self, _node_idx: usize, first_tri: usize, tri_count: usize) -> (usize, f32, f32) {
+        const BINS: usize = 50;
+        let mut best_axis = 0;
+        let mut best_split_pos = 0.0;
+        let mut lowest_cost = 1e30;
+        let bounds = self.aabb_from_centroids(first_tri, tri_count);
+        for axis in 0..3 {
+            let min = *bounds.min.index(axis);
+            let max = *bounds.max.index(axis);
+            if min == max { continue }
+
+            let mut bins = [Bin::new(); BINS];
+            let factor = BINS as f32 / (max - min);
+            for i in first_tri..(first_tri + tri_count) {
+                let tri = self.fetch_triangle(i);
+                let bin_idx = usize::min(BINS - 1, ((tri.centroid[axis] - min) * factor) as usize);
+                bins[bin_idx].tri_count += 1;
+                bins[bin_idx].bounds.include(self.fetch_vertex(tri.p0));
+                bins[bin_idx].bounds.include(self.fetch_vertex(tri.p1));
+                bins[bin_idx].bounds.include(self.fetch_vertex(tri.p2));
+            }
+
+            let mut left_area = [0.0f32; BINS - 1];
+            let mut right_area = [0.0f32; BINS - 1];
+            let mut left_count = [0u32; BINS - 1];
+            let mut right_count = [0u32; BINS - 1];
+            let mut left_box = AABBBuilder::new();
+            let mut right_box = AABBBuilder::new();
+            let mut left_sum = 0;
+            let mut right_sum = 0;
+
+            for i in 0..(BINS - 1) {
+                left_sum += bins[i].tri_count;
+                left_count[i] = left_sum;
+                left_box.include_other(&bins[i].bounds);
+                left_area[i] = left_box.area();
+
+                right_sum += bins[BINS - 1 - i].tri_count;
+                right_count[BINS - 2 - i] = right_sum;
+                right_box.include_other(&bins[BINS - 1 - i].bounds);
+                right_area[BINS - 2 - i] = right_box.area();
+            }
+
+            let step_size = (max - min) / BINS as f32;
+            for i in 0..(BINS - 1) {
+                let cost = left_count[i] as f32 * left_area[i] + right_count[i] as f32 * right_area[i];
+                if cost < lowest_cost {
+                    best_axis = axis;
+                    best_split_pos = min + step_size * (i + 1) as f32;
+                    lowest_cost = cost;
+                }
+            }
+        }
+        (best_axis, best_split_pos, lowest_cost)
+    }
+
     // first version, uses midpoint algorithm to split nodes
     // construction time: fast O(N)
     // traverse time: slow
+    #[deprecated]
+    #[allow(dead_code)]
     fn split_leaf_node(&mut self, node_idx: usize) {
         let node_count = self.nodes.len();
         let first_triangle = self.fetch_node(node_idx).first_triangle() as usize;
@@ -239,7 +309,7 @@ impl BVHBuilder {
         if triangle_count <= 1 { return }
 
         // find axis and split pos with minimal cost
-        let (axis, split_pos, cost) = self.find_best_split_step(node_idx, first_triangle, triangle_count);
+        let (axis, split_pos, cost) = self.find_best_split_binned(node_idx, first_triangle, triangle_count);
 
         // if the minimal cost is higher than the parent cost, don't split
         let parent_cost = triangle_count as f32 * self.fetch_node(node_idx).bounds().area();
