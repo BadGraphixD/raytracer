@@ -36,7 +36,6 @@ impl BVHTriangle {
 pub struct BVHBuilder {
     vertices: Vec<Vector3<f32>>,
     triangles: Vec<BVHTriangle>,
-    triangle_indices: Vec<usize>,
     nodes: Vec<BVHNode>,
 }
 
@@ -44,7 +43,6 @@ impl BVHBuilder {
     pub fn new(vertices: Vec<Vector3<f32>>, triangles: Vec<Triangle>) -> Self {
         Self {
             triangles: triangles.iter().map(|tri| BVHTriangle::new(tri, &vertices)).collect(),
-            triangle_indices: (0..triangles.len()).into_iter().collect(),
             nodes: vec![],
             vertices,
         }
@@ -54,7 +52,7 @@ impl BVHBuilder {
         self.create_leaf_node_from_triangles(0, self.triangles.len());
         self.split_leaf_node_sah(0);
         (self.vertices,
-         self.triangle_indices.iter().map(|idx| self.triangles[*idx].to_tri()).collect(),
+         self.triangles.iter().map(BVHTriangle::to_tri).collect(),
          self.nodes)
     }
 
@@ -63,7 +61,7 @@ impl BVHBuilder {
     }
 
     fn fetch_triangle(&self, index: usize) -> &BVHTriangle {
-        &self.triangles[self.triangle_indices[index]]
+        &self.triangles[index]
     }
 
     fn fetch_node(&self, index: usize) -> &BVHNode {
@@ -107,7 +105,7 @@ impl BVHBuilder {
     }
 
     #[deprecated]
-    #[allow(dead_code)]
+    #[allow(dead_code, deprecated)]
     fn evaluate_split_sah(&self, node_idx: usize, axis: usize, split_pos: f32) -> f32 {
         let mut left_aabb = AABBBuilder::new();
         let mut right_aabb = AABBBuilder::new();
@@ -260,7 +258,7 @@ impl BVHBuilder {
     // construction time: fast O(N)
     // traverse time: slow
     #[deprecated]
-    #[allow(dead_code)]
+    #[allow(dead_code, deprecated)]
     fn split_leaf_node(&mut self, node_idx: usize) {
         let node_count = self.nodes.len();
         let first_triangle = self.fetch_node(node_idx).first_triangle() as usize;
