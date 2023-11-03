@@ -34,6 +34,10 @@ impl AABB {
         self.max.y = f32::max(self.max.y, point.y);
         self.max.z = f32::max(self.max.z, point.z);
     }
+    pub fn area(&self) -> f32 {
+        let extent = self.max - self.min;
+        extent.x * extent.y + extent.y * extent.z + extent.z * extent.x
+    }
 }
 
 #[derive(Debug)]

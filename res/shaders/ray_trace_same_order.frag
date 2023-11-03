@@ -45,15 +45,14 @@ layout (std430, binding = 2) buffer nodeBuffer {
     Node nodes[];
 };
 
-float intersectAABB(const Ray ray, const AABB aabb, const float t) {
+bool intersectAABB(const Ray ray, const AABB aabb, const float t) {
     float tx1 = (aabb.minx - ray.org.x) / ray.dir.x, tx2 = (aabb.maxx - ray.org.x) / ray.dir.x;
     float tmin = min( tx1, tx2 ), tmax = max( tx1, tx2 );
     float ty1 = (aabb.miny - ray.org.y) / ray.dir.y, ty2 = (aabb.maxy - ray.org.y) / ray.dir.y;
     tmin = max( tmin, min( ty1, ty2 ) ), tmax = min( tmax, max( ty1, ty2 ) );
     float tz1 = (aabb.minz - ray.org.z) / ray.dir.z, tz2 = (aabb.maxz - ray.org.z) / ray.dir.z;
     tmin = max( tmin, min( tz1, tz2 ) ), tmax = min( tmax, max( tz1, tz2 ) );
-    return (tmax >= tmin && tmin < t && tmax > 0) ? tmin : 1e30;
-    // 1e30 denotes miss
+    return tmax >= tmin && tmin < t && tmax > 0;
 }
 
 float intersectTriangle(const Ray ray, const vec3 p0, const vec3 p1, const vec3 p2) {
@@ -83,45 +82,37 @@ float intersectTriangle(const Ray ray, const vec3 p0, const vec3 p1, const vec3 
 
 vec3 fetchVertex(int index) {
     return vec3(
-        vertices[index * 3 + 0],
-        vertices[index * 3 + 1],
-        vertices[index * 3 + 2]
+    vertices[index * 3 + 0],
+    vertices[index * 3 + 1],
+    vertices[index * 3 + 2]
     );
 }
 
 void traverseBVH(const Ray ray, inout float t, out int intersections) {
     NodeStack stack;
-
-    intersections++;
-    // only push root onto stack when ray hits it
-    stack.idx = intersectAABB(ray, nodes[0].aabb, t) == 1e30 ? 0 : 1;
     stack.nodes[0] = 0;
+    stack.idx = 1;
 
     while (stack.idx > 0) {
-        // we assume, that all nodes in the stack were hit
         Node node = nodes[stack.nodes[--stack.idx]];
+
+        intersections++;
+        if (!intersectAABB(ray, node.aabb, t)) continue;
         if (node.is_leaf) {
             for (int i = node.a; i < node.a + node.b; i++) {
+                intersections++;
                 float new_t = intersectTriangle(ray,
-                    fetchVertex(triangles[i].p0),
-                    fetchVertex(triangles[i].p1),
-                    fetchVertex(triangles[i].p2)
+                fetchVertex(triangles[i].p0),
+                fetchVertex(triangles[i].p1),
+                fetchVertex(triangles[i].p2)
                 );
                 if (new_t > EPSILON && new_t < t) {
                     t = new_t;
                 }
             }
         } else {
-            intersections += 2;
-            float dist0 = intersectAABB(ray, nodes[node.a].aabb, t);
-            float dist1 = intersectAABB(ray, nodes[node.b].aabb, t);
-            if (dist0 < dist1) {
-                if (dist1 != 1e30) stack.nodes[stack.idx++] = node.b;
-                if (dist0 != 1e30) stack.nodes[stack.idx++] = node.a;
-            } else {
-                if (dist0 != 1e30) stack.nodes[stack.idx++] = node.a;
-                if (dist1 != 1e30) stack.nodes[stack.idx++] = node.b;
-            }
+            stack.nodes[stack.idx++] = node.a;
+            stack.nodes[stack.idx++] = node.b;
         }
     }
 }
