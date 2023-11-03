@@ -1,51 +1,86 @@
+use std::ops::Index;
 use crate::raytracing::types::{BVHNode, Triangle, AABB};
 use cgmath::Vector3;
-use std::ops::Index;
 
-fn centroid_axis(tri: &Triangle, vertices: &Vec<Vector3<f32>>, axis: usize) -> f32 {
-    const THIRD: f32 = 1.0 / 3.0;
-    (
-        vertices[tri.p0 as usize].index(axis) +
-        vertices[tri.p1 as usize].index(axis) +
-        vertices[tri.p2 as usize].index(axis)
-    ) * THIRD
+struct BVHTriangle {
+    p0: usize,
+    p1: usize,
+    p2: usize,
+    centroid: [f32; 3],
+}
+
+impl BVHTriangle {
+    fn new(triangle: &Triangle, vertices: &Vec<Vector3<f32>>) -> Self {
+        const THIRD: f32 = 1.0 / 3.0;
+        let centroid = (
+            vertices[triangle.p0 as usize] +
+            vertices[triangle.p1 as usize] +
+            vertices[triangle.p2 as usize]
+        ) * THIRD;
+        Self {
+            p0: triangle.p0 as usize,
+            p1: triangle.p1 as usize,
+            p2: triangle.p2 as usize,
+            centroid: [ centroid.x, centroid.y, centroid.z ]
+        }
+    }
+    fn to_tri(&self) -> Triangle {
+        Triangle {
+            p0: self.p0 as u32,
+            p1: self.p1 as u32,
+            p2: self.p2 as u32,
+        }
+    }
 }
 
 pub struct BVHBuilder {
     vertices: Vec<Vector3<f32>>,
-    triangles: Vec<Triangle>,
+    triangles: Vec<BVHTriangle>,
+    triangle_indices: Vec<usize>,
     nodes: Vec<BVHNode>,
+    total_sah: f32,
 }
 
 impl BVHBuilder {
     pub fn new(vertices: Vec<Vector3<f32>>, triangles: Vec<Triangle>) -> Self {
         Self {
-            vertices,
-            triangles,
+            triangles: triangles.iter().map(|tri| BVHTriangle::new(tri, &vertices)).collect(),
+            triangle_indices: (0..triangles.len()).into_iter().collect(),
             nodes: vec![],
+            vertices,
+            total_sah: 0.0,
         }
     }
 
     pub fn build(mut self) -> (Vec<Vector3<f32>>, Vec<Triangle>, Vec<BVHNode>) {
-        self.create_leaf_node(0, self.triangles.len() as i32);
+        self.create_leaf_node(0, self.triangles.len());
         self.split_leaf_node(0);
-        //self.split_leaf_node_sah(0); // much slower to trace for some reason ???
-        // maybe because more memory / more nodes used
-        // maybe some flaw in the construction or the sah evaluation is incorrect?
-        (self.vertices, self.triangles, self.nodes)
+        println!("{}", self.total_sah);
+        (self.vertices,
+         self.triangle_indices.iter().map(|idx| self.triangles[*idx].to_tri()).collect(),
+         self.nodes)
     }
 
-    fn create_leaf_node(&mut self, first_triangle: i32, triangle_count: i32) {
+    fn create_leaf_node(&mut self, first_triangle: usize, triangle_count: usize) {
         let mut bounds = AABB::smallest_bounds();
-        self.triangles[first_triangle as usize..(first_triangle + triangle_count) as usize]
-            .iter()
-            .for_each(|tri| {
-                bounds.include(self.vertices[tri.p0 as usize]);
-                bounds.include(self.vertices[tri.p1 as usize]);
-                bounds.include(self.vertices[tri.p2 as usize]);
-            });
-        self.nodes
-            .push(BVHNode::new_leaf(bounds, first_triangle, triangle_count))
+        self.triangle_indices[first_triangle..first_triangle + triangle_count]
+            .iter().map(|idx| self.fetch_triangle(*idx)).for_each(|tri| {
+                bounds.include(self.vertices[tri.p0]);
+                bounds.include(self.vertices[tri.p1]);
+                bounds.include(self.vertices[tri.p2]);
+        });
+        self.nodes.push(BVHNode::new_leaf(bounds, first_triangle as u32, triangle_count as u32))
+    }
+
+    fn fetch_triangle(&self, index: usize) -> &BVHTriangle {
+        &self.triangles[self.triangle_indices[index]]
+    }
+
+    fn fetch_node(&self, index: usize) -> &BVHNode {
+        &self.nodes[index]
+    }
+    fn fetch_node_mut(&mut self, index: usize) -> &mut BVHNode {
+        &mut self.nodes[index]
     }
 
     fn evaluate_sah(&self, node_idx: usize, axis: usize, split_pos: f32) -> f32 {
@@ -53,102 +88,49 @@ impl BVHBuilder {
         let mut right_aabb = AABB::smallest_bounds();
         let mut left_count = 0;
         let mut right_count = 0;
-        for i in 0..self.nodes[node_idx].triangle_count() as usize {
-            let tri = &self.triangles[self.nodes[node_idx].first_triangle() as usize + i];
-            if centroid_axis(tri, &self.vertices, axis) < split_pos {
+        let node = self.fetch_node(node_idx);
+        for i in 0..node.triangle_count() {
+            let tri = self.fetch_triangle((node.first_triangle() + i) as usize);
+            if tri.centroid[axis] > split_pos {
                 left_count += 1;
-                left_aabb.include(self.vertices[tri.p0 as usize]);
-                left_aabb.include(self.vertices[tri.p1 as usize]);
-                left_aabb.include(self.vertices[tri.p2 as usize]);
+                left_aabb.include(self.vertices[tri.p0]);
+                left_aabb.include(self.vertices[tri.p1]);
+                left_aabb.include(self.vertices[tri.p2]);
             } else {
                 right_count += 1;
-                right_aabb.include(self.vertices[tri.p0 as usize]);
-                right_aabb.include(self.vertices[tri.p1 as usize]);
-                right_aabb.include(self.vertices[tri.p2 as usize]);
+                right_aabb.include(self.vertices[tri.p0]);
+                right_aabb.include(self.vertices[tri.p1]);
+                right_aabb.include(self.vertices[tri.p2]);
             }
         }
-        let cost = left_count as f32 * left_aabb.area() + right_count as f32 * right_aabb.area();
-        if cost > 0.0 { cost } else { 1e30 }
+        left_count as f32 * left_aabb.area() + right_count as f32 * right_aabb.area()
     }
 
-    fn split_leaf_node_sah(&mut self, node_idx: usize) {
-        let node_count = self.nodes.len() as i32;
+    fn split_triangles_along_plane(&mut self, mut first: usize, mut last: usize, axis: usize, position: f32) -> usize {
+        loop {
+            if self.fetch_triangle(first).centroid[axis] < position {
+                first += 1;
+                if first > last { break }
+            } else {
+                self.triangles.swap(first, last);
+                if last <= first { break }
+                last -= 1;
+            }
+        }
+        first
+    }
+
+    fn split_leaf_node(&mut self, node_idx: usize) {
+        let node_count = self.nodes.len();
         let first_triangle = self.nodes[node_idx].first_triangle() as usize;
         let triangle_count = self.nodes[node_idx].triangle_count() as usize;
 
         // if leaf has only one triangle, leave as leaf
-        if triangle_count <= 1 {
-            return;
-        }
+        if triangle_count <= 1 { return }
 
         // choose axis to split on
-        let mut best_axis = 0;
-        let mut best_split_pos: f32 = 0.0;
-        let mut lowest_cost: f32 = 1e30;
-        for candidate_axis in 0..3 {
-            for i in 0..triangle_count {
-                let candidate_split_pos = centroid_axis(&self.triangles[i], &self.vertices, candidate_axis);
-                let cost = self.evaluate_sah(node_idx, candidate_axis, candidate_split_pos);
-                if cost < lowest_cost {
-                    best_axis = candidate_axis;
-                    best_split_pos = candidate_split_pos;
-                    lowest_cost = cost;
-                }
-            }
-        }
-
-        // sort triangles along axis
-        let mut i = first_triangle;
-        let mut j = i + triangle_count - 1;
-        while i <= j {
-            if centroid_axis(&self.triangles[i], &self.vertices, best_axis) < best_split_pos {
-                i += 1;
-            } else {
-                self.triangles.swap(i, j);
-                j -= 1;
-            }
-        }
-
-        // if split node would contain all or no triangles, dont split
-        let left_count = i - first_triangle;
-        if left_count == 0 || left_count == triangle_count {
-            return;
-        }
-
-        let right_child = node_count;
-        let left_child = node_count + 1;
-
-        // create and split child nodes
-        self.nodes[node_idx].convert_to_node(right_child, left_child);
-
-        self.create_leaf_node(first_triangle as i32, left_count as i32);
-        self.create_leaf_node(i as i32, (triangle_count - left_count) as i32);
-
-        self.split_leaf_node_sah(right_child as usize);
-        self.split_leaf_node_sah(left_child as usize);
-    }
-
-    fn split_leaf_node(&mut self, node_idx: usize) {
-        // todo: fix problems
-        // problems:
-        //  - split_pos is middle of bounding box, should be middle of all triangle positions
-        //    this means, that sometimes all triangles fall on one side of the split, and there is no speedup
-        //  - this method is recursive, should be iterative
-        //  - triangles are being swapped, can impact performance if triangle struct get larger (uvs, material ids, etc.)
-        //  - centroids are calculated newly every time, should be calculated once at start and reused
-        // todo: implement surface area heuristics
-        // decide to split, when split will result in lower surface area overall
-        // all split positions should be checked for every axis, so that split with lowest SA can be found
-        let node_count = self.nodes.len() as i32;
-        let leaf = &mut self.nodes[node_idx];
-
-        // if leaf has only one triangle, leave as leaf
-        if leaf.triangle_count() <= 1 {
-            return;
-        }
-
-        // choose axis to split on
-        let size = leaf.bounds().max - leaf.bounds().min;
+        let bounds = self.fetch_node(node_idx).bounds();
+        let size = bounds.max - bounds.min;
         let mut axis = 0;
         if size.y > size.x {
             axis = 1
@@ -156,38 +138,35 @@ impl BVHBuilder {
         if size.z > *size.index(axis) {
             axis = 2
         };
-        let split_pos = *leaf.bounds().min.index(axis) + *size.index(axis) * 0.5;
+        let split_pos = *bounds.min.index(axis) + *size.index(axis) * 0.5;
 
         // sort triangles along axis
-        let mut i = leaf.first_triangle() as usize;
-        let mut j = i + leaf.triangle_count() as usize - 1;
-        while i <= j {
-            if centroid_axis(&self.triangles[i], &self.vertices, axis) < split_pos {
-                i += 1;
-            } else {
-                self.triangles.swap(i, j);
-                j -= 1;
-            }
-        }
+        let middle = self.split_triangles_along_plane(
+            first_triangle,
+            first_triangle + triangle_count - 1,
+            axis, split_pos,
+        );
 
         // if split node would contain all or no triangles, dont split
-        let left_count = i as i32 - leaf.first_triangle();
-        if left_count == 0 || left_count == leaf.triangle_count() {
+        let left_count = middle - first_triangle;
+        if left_count == 0 || left_count == triangle_count {
             return;
         }
+
+        self.total_sah += self.evaluate_sah(node_idx, axis, split_pos);
 
         let right_child = node_count;
         let left_child = node_count + 1;
 
         // create and split child nodes
-        let first_tri = leaf.first_triangle();
-        let tri_count = leaf.triangle_count();
-        leaf.convert_to_node(right_child, left_child);
+        let first_tri = first_triangle;
+        let tri_count = triangle_count;
+        self.fetch_node_mut(node_idx).convert_to_node(right_child as u32, left_child as u32);
 
         self.create_leaf_node(first_tri, left_count);
-        self.create_leaf_node(i as i32, tri_count - left_count);
+        self.create_leaf_node(middle, tri_count - left_count);
 
-        self.split_leaf_node(right_child as usize);
-        self.split_leaf_node(left_child as usize);
+        self.split_leaf_node(right_child);
+        self.split_leaf_node(left_child);
     }
 }

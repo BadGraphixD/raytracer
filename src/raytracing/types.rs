@@ -1,13 +1,13 @@
 use cgmath::{Array, Vector3};
 
 pub struct Triangle {
-    pub p0: i32,
-    pub p1: i32,
-    pub p2: i32,
+    pub p0: u32,
+    pub p1: u32,
+    pub p2: u32,
 }
 
 impl Triangle {
-    pub fn new(p0: i32, p1: i32, p2: i32) -> Self {
+    pub fn new(p0: u32, p1: u32, p2: u32) -> Self {
         Self { p0, p1, p2 }
     }
 }
@@ -23,7 +23,8 @@ impl AABB {
         Self { min, max }
     }
     pub fn smallest_bounds() -> Self {
-        Self::new(Vector3::from_value(f32::MAX), Vector3::from_value(f32::MIN))
+        // Values squared must fit into f32, so that area of smallest box will not be NaN
+        Self::new(Vector3::from_value(1e16), Vector3::from_value(-1e16))
     }
     pub fn include(&mut self, point: Vector3<f32>) {
         self.min.x = f32::min(self.min.x, point.x);
@@ -35,8 +36,8 @@ impl AABB {
         self.max.z = f32::max(self.max.z, point.z);
     }
     pub fn area(&self) -> f32 {
-        let extent = self.max - self.min;
-        extent.x * extent.y + extent.y * extent.z + extent.z * extent.x
+        let e = self.max - self.min;
+        e.x * e.y + e.y * e.z + e.z * e.x
     }
 }
 
@@ -47,12 +48,12 @@ pub struct BVHNode {
 
     // can hold either:     right_node, left_node
     // or:                  first_triangle, triangle_count
-    a: i32,
-    b: i32,
+    a: u32,
+    b: u32,
 }
 
 impl BVHNode {
-    pub fn new_node(bounds: AABB, right_node: i32, left_node: i32) -> Self {
+    pub fn new_node(bounds: AABB, right_node: u32, left_node: u32) -> Self {
         Self {
             bounds,
             is_leaf: 0,
@@ -61,7 +62,7 @@ impl BVHNode {
         }
     }
 
-    pub fn new_leaf(bounds: AABB, first_triangle: i32, triangle_count: i32) -> Self {
+    pub fn new_leaf(bounds: AABB, first_triangle: u32, triangle_count: u32) -> Self {
         Self {
             bounds,
             is_leaf: 1,
@@ -70,7 +71,7 @@ impl BVHNode {
         }
     }
 
-    pub fn convert_to_node(&mut self, right_node: i32, left_node: i32) {
+    pub fn convert_to_node(&mut self, right_node: u32, left_node: u32) {
         self.is_leaf = 0;
         self.a = right_node;
         self.b = left_node;
@@ -83,17 +84,17 @@ impl BVHNode {
         self.is_leaf != 0
     }
 
-    pub fn right_node(&self) -> i32 {
+    pub fn right_node(&self) -> u32 {
         self.a
     }
-    pub fn left_node(&self) -> i32 {
+    pub fn left_node(&self) -> u32 {
         self.b
     }
 
-    pub fn first_triangle(&self) -> i32 {
+    pub fn first_triangle(&self) -> u32 {
         self.a
     }
-    pub fn triangle_count(&self) -> i32 {
+    pub fn triangle_count(&self) -> u32 {
         self.b
     }
 }

@@ -21,16 +21,16 @@ struct AABB {
 struct Node {
     AABB aabb;
     bool is_leaf;
-    int a, b;
+    uint a, b;
 };
 
 struct Triangle {
-    int p0, p1, p2;
+    uint p0, p1, p2;
 };
 
 struct NodeStack {
-    int nodes[NODE_STACK_SIZE];
-    int idx;
+    uint nodes[NODE_STACK_SIZE];
+    uint idx;
 };
 
 layout (std430, binding = 0) buffer vertexBuffer {
@@ -81,7 +81,7 @@ float intersectTriangle(const Ray ray, const vec3 p0, const vec3 p1, const vec3 
     return f * dot(edge2, q);
 }
 
-vec3 fetchVertex(int index) {
+vec3 fetchVertex(uint index) {
     return vec3(
         vertices[index * 3 + 0],
         vertices[index * 3 + 1],
@@ -101,7 +101,8 @@ void traverseBVH(const Ray ray, inout float t, out int intersections) {
         // we assume, that all nodes in the stack were hit
         Node node = nodes[stack.nodes[--stack.idx]];
         if (node.is_leaf) {
-            for (int i = node.a; i < node.a + node.b; i++) {
+            for (uint i = node.a; i < node.a + node.b; i++) {
+                intersections++;
                 float new_t = intersectTriangle(ray,
                     fetchVertex(triangles[i].p0),
                     fetchVertex(triangles[i].p1),
@@ -133,6 +134,7 @@ void main() {
     int intersections = 0;
     traverseBVH(Ray(org, dir), t, intersections);
 
-    fragCol = vec4(intersections / 100.0, 0, 0, 1);
+    fragCol = vec4(intersections / 100.0, 0, t > 1000 ? 0 : 1, 1);
+    //fragCol = vec4(intersections / 100.0, 0, 0, 1);
     //fragCol = t > 1000 ? vec4(dir, 1) : vec4(org + dir * t, 1);
 }
