@@ -65,13 +65,13 @@ fn main() {
         .unwrap();
 
     // load models
-    let (model_vertices, model_triangles) = ModelParser::parse(models.read_file("armadillo_midres.obj").unwrap()).unwrap();
+    let model = ModelParser::parse(models.read_file("dragon.obj").unwrap()).unwrap();
 
     let start = SystemTime::now();
-    let (model_vertices, model_triangles, model_nodes) = BVHBuilder::new(model_vertices, model_triangles).build();
+    let (model_nodes, model) = BVHBuilder::new(model).build();
     let end = SystemTime::now();
     let build_time = end.duration_since(start).expect("Time measurement failed!");
-    println!("{build_time:?}");
+    println!("BVH Build time: {build_time:?}");
 
     // get shader uniform locations
     let ray_create_right_loc = ray_create_program.uniform_location("right");
@@ -80,6 +80,8 @@ fn main() {
 
     let ray_trace_dir_tex_loc = ray_trace_program.uniform_location("dirTex");
     let ray_trace_org_loc = ray_trace_program.uniform_location("org");
+    let ray_trace_has_uvs_loc = ray_trace_program.uniform_location("hasUVs");
+    let ray_trace_has_normals_loc = ray_trace_program.uniform_location("hasNormals");
 
     let display_program_tex_loc = display_program.uniform_location("display");
 
@@ -108,18 +110,22 @@ fn main() {
     let (_vbo, _ibo, square_geometry) = GeometrySetBuilder::create_square_geometry();
 
     // create buffer with mesh data
-    let vertex_ssbo = ShaderStorageBuffer::new();
-    let triangle_ssbo = ShaderStorageBuffer::new();
     let node_ssbo = ShaderStorageBuffer::new();
-    vertex_ssbo.buffer_data(&model_vertices);
-    triangle_ssbo.buffer_data(&model_triangles);
+    let triangle_ssbo = ShaderStorageBuffer::new();
+    let position_ssbo = ShaderStorageBuffer::new();
+    let uv_ssbo = ShaderStorageBuffer::new();
+    let normal_ssbo = ShaderStorageBuffer::new();
     node_ssbo.buffer_data(&model_nodes);
+    triangle_ssbo.buffer_data(model.triangles());
+    position_ssbo.buffer_data(model.positions());
+    if let Some(model_uvs) = model.uvs() { uv_ssbo.buffer_data(model_uvs) }
+    if let Some(model_normals) = model.normals() { uv_ssbo.buffer_data(model_normals) }
 
     while !window.should_close() {
         // handle events
         window.handle_events();
         camera_controller.control(&mut camera, &window, window.dt());
-        println!("{}", 1.0 / window.dt());
+        println!("FPS: {}", (1.0 / window.dt()) as i32);
 
         // todo: move everything opengl-related from here to render thread
 
@@ -145,9 +151,13 @@ fn main() {
         ray_dir_texture.bind_to_slot(0);
         ray_trace_program.set_uniform_texture(ray_trace_dir_tex_loc, 0);
         ray_trace_program.set_uniform_3f(ray_trace_org_loc, cvv.pos);
-        vertex_ssbo.bind_to_slot(0);
+        ray_trace_program.set_uniform_1b(ray_trace_has_uvs_loc, model.has_uvs());
+        ray_trace_program.set_uniform_1b(ray_trace_has_normals_loc, model.has_normals());
+        node_ssbo.bind_to_slot(0);
         triangle_ssbo.bind_to_slot(1);
-        node_ssbo.bind_to_slot(2);
+        position_ssbo.bind_to_slot(2);
+        if model.has_uvs() { uv_ssbo.bind_to_slot(3) }
+        if model.has_normals() { normal_ssbo.bind_to_slot(4) }
         square_geometry.draw();
 
         // render ray data onto screen

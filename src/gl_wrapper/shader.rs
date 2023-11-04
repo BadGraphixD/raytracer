@@ -132,6 +132,14 @@ impl ShaderProgram {
     pub fn set_uniform_3f(&self, location: i32, v: Vector3<f32>) {
         unsafe { gl::Uniform3f(location, v[0], v[1], v[2]) }
     }
+
+    pub fn set_uniform_1i(&self, location: i32, i: i32) {
+        unsafe { gl::Uniform1i(location, i) }
+    }
+
+    pub fn set_uniform_1b(&self, location: i32, b: bool) {
+        unsafe { gl::Uniform1i(location, b as i32) }
+    }
 }
 
 impl Drop for ShaderProgram {

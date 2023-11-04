@@ -1,6 +1,7 @@
 use std::ops::Index;
 use crate::raytracing::types::{BVHNode, Triangle, AABB, AABBBuilder, Bin};
 use cgmath::Vector3;
+use crate::rendering::model::Model;
 
 struct BVHTriangle {
     p0: usize,
@@ -34,32 +35,31 @@ impl BVHTriangle {
 }
 
 pub struct BVHBuilder {
-    vertices: Vec<Vector3<f32>>,
+    model: Model,
     triangles: Vec<BVHTriangle>,
     nodes: Vec<BVHNode>,
 }
 
 impl BVHBuilder {
-    pub fn new(vertices: Vec<Vector3<f32>>, triangles: Vec<Triangle>) -> Self {
+    pub fn new(model: Model) -> Self {
         Self {
-            triangles: triangles.iter().map(|tri| BVHTriangle::new(tri, &vertices)).collect(),
-            nodes: Vec::with_capacity(triangles.len() * 2),
-            vertices,
+            triangles: model.triangles().iter().map(|tri| BVHTriangle::new(tri, model.positions())).collect(),
+            nodes: Vec::with_capacity(model.triangles().len() * 2),
+            model,
         }
     }
 
-    pub fn build(mut self) -> (Vec<Vector3<f32>>, Vec<Triangle>, Vec<BVHNode>) {
+    pub fn build(mut self) -> (Vec<BVHNode>, Model) {
         self.create_leaf_node_from_triangles(0, self.triangles.len());
         // push in dummy to make subsequent node-pairs reside in the same cache line
         self.nodes.push(BVHNode::new_dummy());
         self.split_leaf_node_sah(0);
-        (self.vertices,
-         self.triangles.iter().map(BVHTriangle::to_tri).collect(),
-         self.nodes)
+        self.model.set_triangles(self.triangles.iter().map(BVHTriangle::to_tri).collect());
+        (self.nodes, self.model)
     }
 
-    fn fetch_vertex(&self, index: usize) -> &Vector3<f32> {
-        &self.vertices[index]
+    fn fetch_position(&self, index: usize) -> &Vector3<f32> {
+        &self.model.positions()[index]
     }
 
     fn fetch_triangle(&self, index: usize) -> &BVHTriangle {
@@ -78,9 +78,9 @@ impl BVHBuilder {
         let mut aabb_builder = AABBBuilder::new();
         for i in first..(first + count) {
             let tri = self.fetch_triangle(i);
-            aabb_builder.include(self.fetch_vertex(tri.p0));
-            aabb_builder.include(self.fetch_vertex(tri.p1));
-            aabb_builder.include(self.fetch_vertex(tri.p2));
+            aabb_builder.include(self.fetch_position(tri.p0));
+            aabb_builder.include(self.fetch_position(tri.p1));
+            aabb_builder.include(self.fetch_position(tri.p2));
         }
         aabb_builder.build()
     }
@@ -118,14 +118,14 @@ impl BVHBuilder {
             let tri = self.fetch_triangle((node.first_triangle() + i) as usize);
             if tri.centroid[axis] < split_pos {
                 left_count += 1;
-                left_aabb.include(self.fetch_vertex(tri.p0));
-                left_aabb.include(self.fetch_vertex(tri.p1));
-                left_aabb.include(self.fetch_vertex(tri.p2));
+                left_aabb.include(self.fetch_position(tri.p0));
+                left_aabb.include(self.fetch_position(tri.p1));
+                left_aabb.include(self.fetch_position(tri.p2));
             } else {
                 right_count += 1;
-                right_aabb.include(self.fetch_vertex(tri.p0));
-                right_aabb.include(self.fetch_vertex(tri.p1));
-                right_aabb.include(self.fetch_vertex(tri.p2));
+                right_aabb.include(self.fetch_position(tri.p0));
+                right_aabb.include(self.fetch_position(tri.p1));
+                right_aabb.include(self.fetch_position(tri.p2));
             }
         }
         left_count as f32 * left_aabb.area() + right_count as f32 * right_aabb.area()
@@ -217,9 +217,9 @@ impl BVHBuilder {
                 let tri = self.fetch_triangle(i);
                 let bin_idx = usize::min(BINS - 1, ((tri.centroid[axis] - min) * factor) as usize);
                 bins[bin_idx].tri_count += 1;
-                bins[bin_idx].bounds.include(self.fetch_vertex(tri.p0));
-                bins[bin_idx].bounds.include(self.fetch_vertex(tri.p1));
-                bins[bin_idx].bounds.include(self.fetch_vertex(tri.p2));
+                bins[bin_idx].bounds.include(self.fetch_position(tri.p0));
+                bins[bin_idx].bounds.include(self.fetch_position(tri.p1));
+                bins[bin_idx].bounds.include(self.fetch_position(tri.p2));
             }
 
             let mut left_area = [0.0f32; BINS - 1];

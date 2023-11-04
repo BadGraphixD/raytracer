@@ -5,6 +5,8 @@ out vec4 fragCol;
 
 uniform sampler2D dirTex;
 uniform vec3 org;
+uniform bool hasUVs;
+uniform bool hasNormals;
 
 const float EPSILON = 0.000001;
 const int NODE_STACK_SIZE = 100;
@@ -33,16 +35,24 @@ struct NodeStack {
     uint idx;
 };
 
-layout (std430, binding = 0) buffer vertexBuffer {
-    float vertices[];
+layout (std430, binding = 0) buffer nodeBuffer {
+    Node nodes[];
 };
 
 layout (std430, binding = 1) buffer triangleBuffer {
     Triangle triangles[];
 };
 
-layout (std430, binding = 2) buffer nodeBuffer {
-    Node nodes[];
+layout (std430, binding = 2) buffer positionBuffer {
+    float positions[];
+};
+
+layout (std430, binding = 3) buffer uvBuffer {
+    float uvs[];
+};
+
+layout (std430, binding = 4) buffer normalBuffer {
+    float normals[];
 };
 
 float intersectAABB(const Ray ray, const AABB aabb, const float t) {
@@ -82,11 +92,19 @@ float intersectTriangle(const Ray ray, const vec3 p0, const vec3 p1, const vec3 
     return f * dot(edge2, q);
 }
 
-vec3 fetchVertex(uint index) {
+vec3 fetchPosition(uint index) {
     return vec3(
-        vertices[index * 3 + 0],
-        vertices[index * 3 + 1],
-        vertices[index * 3 + 2]
+        positions[index * 3 + 0],
+        positions[index * 3 + 1],
+        positions[index * 3 + 2]
+    );
+}
+
+vec3 fetchNormal(uint index) {
+    return vec3(
+        normals[index * 3 + 0],
+        normals[index * 3 + 1],
+        normals[index * 3 + 2]
     );
 }
 
@@ -108,9 +126,9 @@ void traverseBVH(const Ray ray, inout float t, inout uint triangleIdx, inout vec
                 intersections++;
                 vec2 uv;
                 float new_t = intersectTriangle(ray,
-                    fetchVertex(triangles[i].p0),
-                    fetchVertex(triangles[i].p1),
-                    fetchVertex(triangles[i].p2),
+                    fetchPosition(triangles[i].p0),
+                    fetchPosition(triangles[i].p1),
+                    fetchPosition(triangles[i].p2),
                     uv
                 );
                 if (new_t > EPSILON && new_t < t) {
@@ -148,11 +166,19 @@ void traverseBVH(const Ray ray, inout float t, inout uint triangleIdx, inout vec
     }
 }
 
-vec3 triangleNormal(const uint idx) {
-    vec3 v0 = fetchVertex(triangles[idx].p0);
-    vec3 v1 = fetchVertex(triangles[idx].p1);
-    vec3 v2 = fetchVertex(triangles[idx].p2);
-    return normalize(cross(v1 - v0, v2 - v0));
+vec3 triangleNormal(const uint idx, const vec2 uv) {
+    if (hasNormals) {
+        // todo: not working
+        vec3 n0 = fetchNormal(triangles[idx].p0);
+        vec3 n1 = fetchNormal(triangles[idx].p1);
+        vec3 n2 = fetchNormal(triangles[idx].p2);
+        return n0;
+    } else {
+        vec3 v0 = fetchPosition(triangles[idx].p0);
+        vec3 v1 = fetchPosition(triangles[idx].p1);
+        vec3 v2 = fetchPosition(triangles[idx].p2);
+        return normalize(cross(v1 - v0, v2 - v0));
+    }
 }
 
 void main() {
@@ -163,22 +189,13 @@ void main() {
     uint triangleIdx = 0;
     vec2 uv = vec2(0);
 
-    /*
-    // OVERKILL (400 objects):
-    const uint range = 20;
-    for (int i = 0; i < range; i++) {
-        for (int j = 0; j < range; j++) {
-            traverseBVH(Ray(org + vec3(i * 14, 0, j * 6), dir, 1 / dir), t, triangleIdx, intersections);
-        }
-    }
-    */
-
     traverseBVH(Ray(org, dir, 1 / dir), t, triangleIdx, uv, intersections);
 
-    vec3 normal = triangleNormal(triangleIdx);
+    vec3 normal = triangleNormal(triangleIdx, uv);
     vec3 reflected = reflect(dir, normal);
 
-    fragCol = t > 1000 ? vec4(dir, 1) : vec4(uv, 0, 1);
+    fragCol = t > 1000 ? vec4(dir, 1) : vec4(normal, 1);
+    //fragCol = t > 1000 ? vec4(dir, 1) : vec4(uv, 0, 1);
     //fragCol = t > 1000 ? vec4(dir, 1) : vec4(reflected, 1);
     //fragCol = vec4(intersections / 100.0, 0, t > 1000 ? 0 : 1, 1);
     //fragCol = vec4(intersections / 100.0, 0, 0, 1);
