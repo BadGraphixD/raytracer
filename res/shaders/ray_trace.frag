@@ -56,26 +56,27 @@ float intersectAABB(const Ray ray, const AABB aabb, const float t) {
     // 1e30 denotes miss
 }
 
-float intersectTriangle(const Ray ray, const vec3 p0, const vec3 p1, const vec3 p2) {
+float intersectTriangle(const Ray ray, const vec3 p0, const vec3 p1, const vec3 p2, out vec2 uv) {
     vec3 edge1, edge2, h, s, q;
-    float a, f, u, v;
+    float a, f;
     edge1 = p1 - p0;
     edge2 = p2 - p0;
     h = cross(ray.dir, edge2);
     a = dot(edge1, h);
 
-    if (a > -EPSILON && a < EPSILON) return -1; // This ray is parallel to this triangle.
+    //if (abs(a) < EPSILON) return -1; // This ray is parallel to this triangle.
+    if (a < EPSILON) return -1; // This ray is parallel to this triangle or hitting it from the back
 
     f = 1.0 / a;
     s = ray.org - p0;
-    u = f * dot(s, h);
+    uv.x = f * dot(s, h);
 
-    if (u < 0.0 || u > 1.0) return -1;
+    if (uv.x < 0.0 || uv.x > 1.0) return -1;
 
     q = cross(s, edge1);
-    v = f * dot(ray.dir, q);
+    uv.y = f * dot(ray.dir, q);
 
-    if (v < 0.0 || u + v > 1.0) return -1;
+    if (uv.y < 0.0 || uv.x + uv.y > 1.0) return -1;
 
     // At this stage we can compute t to find out where the intersection point is on the line.
     return f * dot(edge2, q);
@@ -89,11 +90,13 @@ vec3 fetchVertex(uint index) {
     );
 }
 
-void traverseBVH(const Ray ray, inout float t, inout uint triangleIdx, inout uint intersections) {
+void traverseBVH(const Ray ray, inout float t, inout uint triangleIdx, inout vec2 triangleUV, inout uint intersections) {
     NodeStack stack;
 
     intersections++;
     // only push root onto stack when ray hits it
+    // dont remove this, even with tlas, because the root node
+    // of the blas may be smaller than the leaf node of the tlas (translation)
     stack.idx = intersectAABB(ray, nodes[0].aabb, t) == 1e30 ? 0 : 1;
     stack.nodes[0] = 0;
 
@@ -103,13 +106,16 @@ void traverseBVH(const Ray ray, inout float t, inout uint triangleIdx, inout uin
         if (node.is_leaf) {
             for (uint i = node.a; i < node.a + node.b; i++) {
                 intersections++;
+                vec2 uv;
                 float new_t = intersectTriangle(ray,
                     fetchVertex(triangles[i].p0),
                     fetchVertex(triangles[i].p1),
-                    fetchVertex(triangles[i].p2)
+                    fetchVertex(triangles[i].p2),
+                    uv
                 );
                 if (new_t > EPSILON && new_t < t) {
                     triangleIdx = i;
+                    triangleUV = uv;
                     t = new_t;
                 }
             }
@@ -155,6 +161,7 @@ void main() {
     float t = 1000000;
     uint intersections = 0;
     uint triangleIdx = 0;
+    vec2 uv = vec2(0);
 
     /*
     // OVERKILL (400 objects):
@@ -166,13 +173,14 @@ void main() {
     }
     */
 
-    traverseBVH(Ray(org, dir, 1 / dir), t, triangleIdx, intersections);
+    traverseBVH(Ray(org, dir, 1 / dir), t, triangleIdx, uv, intersections);
 
     vec3 normal = triangleNormal(triangleIdx);
     vec3 reflected = reflect(dir, normal);
 
+    fragCol = t > 1000 ? vec4(dir, 1) : vec4(uv, 0, 1);
     //fragCol = t > 1000 ? vec4(dir, 1) : vec4(reflected, 1);
-    fragCol = vec4(intersections / 100.0, 0, t > 1000 ? 0 : 1, 1);
+    //fragCol = vec4(intersections / 100.0, 0, t > 1000 ? 0 : 1, 1);
     //fragCol = vec4(intersections / 100.0, 0, 0, 1);
     //fragCol = t > 1000 ? vec4(dir, 1) : vec4(org + dir * t, 1);
 }

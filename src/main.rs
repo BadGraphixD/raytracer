@@ -65,7 +65,7 @@ fn main() {
         .unwrap();
 
     // load models
-    let (model_vertices, model_triangles) = ModelParser::parse(models.read_file("dragon.obj").unwrap()).unwrap();
+    let (model_vertices, model_triangles) = ModelParser::parse(models.read_file("armadillo_midres.obj").unwrap()).unwrap();
 
     let start = SystemTime::now();
     let (model_vertices, model_triangles, model_nodes) = BVHBuilder::new(model_vertices, model_triangles).build();

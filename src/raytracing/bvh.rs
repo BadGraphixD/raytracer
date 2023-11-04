@@ -1,6 +1,6 @@
 use std::ops::Index;
 use crate::raytracing::types::{BVHNode, Triangle, AABB, AABBBuilder, Bin};
-use cgmath::{Vector3, Zero};
+use cgmath::Vector3;
 
 struct BVHTriangle {
     p0: usize,
