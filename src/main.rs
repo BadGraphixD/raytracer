@@ -28,15 +28,6 @@ fn main() {
     let shaders = Resource::from_relative_exe_path("res/shaders").unwrap();
     let models = Resource::from_relative_exe_path("res/models").unwrap();
 
-    // load models
-    let (model_vertices, model_triangles) = ModelParser::parse(models.read_file("dragon.obj").unwrap()).unwrap();
-
-    let start = SystemTime::now();
-    let (model_vertices, model_triangles, model_nodes) = BVHBuilder::new(model_vertices, model_triangles).build();
-    let end = SystemTime::now();
-    let build_time = end.duration_since(start).expect("Time measurement failed!");
-    println!("{build_time:?}");
-
     // load shaders
     let default_vert = Shader::new(
         ShaderType::VertexShader,
@@ -72,6 +63,15 @@ fn main() {
         .add_shader(&display_frag)
         .build()
         .unwrap();
+
+    // load models
+    let (model_vertices, model_triangles) = ModelParser::parse(models.read_file("dragon.obj").unwrap()).unwrap();
+
+    let start = SystemTime::now();
+    let (model_vertices, model_triangles, model_nodes) = BVHBuilder::new(model_vertices, model_triangles).build();
+    let end = SystemTime::now();
+    let build_time = end.duration_since(start).expect("Time measurement failed!");
+    println!("{build_time:?}");
 
     // get shader uniform locations
     let ray_create_right_loc = ray_create_program.uniform_location("right");
@@ -119,6 +119,7 @@ fn main() {
         // handle events
         window.handle_events();
         camera_controller.control(&mut camera, &window, window.dt());
+        println!("{}", 1.0 / window.dt());
 
         // todo: move everything opengl-related from here to render thread
 

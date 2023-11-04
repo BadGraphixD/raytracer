@@ -89,7 +89,7 @@ vec3 fetchVertex(uint index) {
     );
 }
 
-void traverseBVH(const Ray ray, inout float t, out int intersections) {
+void traverseBVH(const Ray ray, inout float t, inout uint triangleIdx, inout uint intersections) {
     NodeStack stack;
 
     intersections++;
@@ -109,6 +109,7 @@ void traverseBVH(const Ray ray, inout float t, out int intersections) {
                     fetchVertex(triangles[i].p2)
                 );
                 if (new_t > EPSILON && new_t < t) {
+                    triangleIdx = i;
                     t = new_t;
                 }
             }
@@ -116,6 +117,7 @@ void traverseBVH(const Ray ray, inout float t, out int intersections) {
             intersections += 2;
             float dist0 = intersectAABB(ray, nodes[node.a].aabb, t);
             float dist1 = intersectAABB(ray, nodes[node.b].aabb, t);
+
             if (dist0 < dist1) {
                 if (dist1 != 1e30) stack.nodes[stack.idx++] = node.b;
                 if (dist0 != 1e30) stack.nodes[stack.idx++] = node.a;
@@ -123,17 +125,53 @@ void traverseBVH(const Ray ray, inout float t, out int intersections) {
                 if (dist0 != 1e30) stack.nodes[stack.idx++] = node.a;
                 if (dist1 != 1e30) stack.nodes[stack.idx++] = node.b;
             }
+
+            /*
+            // todo: test if this is faster
+            // note: probably not
+            // Less branching:
+            int ordered = int(dist0 < dist1);
+            uint first = node.b * ordered + node.a * (1 - ordered);
+            uint second = node.a * ordered + node.b * (1 - ordered);
+            float firstDist = dist1 * ordered + dist0 * (1 - ordered);
+            float secondDist = dist0 * ordered + dist1 * (1 - ordered);
+            if (firstDist != 1e30) stack.nodes[stack.idx++] = first;
+            if (secondDist != 1e30) stack.nodes[stack.idx++] = second;
+            */
         }
     }
+}
+
+vec3 triangleNormal(const uint idx) {
+    vec3 v0 = fetchVertex(triangles[idx].p0);
+    vec3 v1 = fetchVertex(triangles[idx].p1);
+    vec3 v2 = fetchVertex(triangles[idx].p2);
+    return normalize(cross(v1 - v0, v2 - v0));
 }
 
 void main() {
     vec3 dir = texture(dirTex, (fragPos + 1) / 2).xyz;
 
     float t = 1000000;
-    int intersections = 0;
-    traverseBVH(Ray(org, dir, 1 / dir), t, intersections);
+    uint intersections = 0;
+    uint triangleIdx = 0;
 
+    /*
+    // OVERKILL (400 objects):
+    const uint range = 20;
+    for (int i = 0; i < range; i++) {
+        for (int j = 0; j < range; j++) {
+            traverseBVH(Ray(org + vec3(i * 14, 0, j * 6), dir, 1 / dir), t, triangleIdx, intersections);
+        }
+    }
+    */
+
+    traverseBVH(Ray(org, dir, 1 / dir), t, triangleIdx, intersections);
+
+    vec3 normal = triangleNormal(triangleIdx);
+    vec3 reflected = reflect(dir, normal);
+
+    //fragCol = t > 1000 ? vec4(dir, 1) : vec4(reflected, 1);
     fragCol = vec4(intersections / 100.0, 0, t > 1000 ? 0 : 1, 1);
     //fragCol = vec4(intersections / 100.0, 0, 0, 1);
     //fragCol = t > 1000 ? vec4(dir, 1) : vec4(org + dir * t, 1);

@@ -1,6 +1,6 @@
 use std::ops::Index;
 use crate::raytracing::types::{BVHNode, Triangle, AABB, AABBBuilder, Bin};
-use cgmath::Vector3;
+use cgmath::{Vector3, Zero};
 
 struct BVHTriangle {
     p0: usize,
@@ -43,13 +43,15 @@ impl BVHBuilder {
     pub fn new(vertices: Vec<Vector3<f32>>, triangles: Vec<Triangle>) -> Self {
         Self {
             triangles: triangles.iter().map(|tri| BVHTriangle::new(tri, &vertices)).collect(),
-            nodes: vec![],
+            nodes: Vec::with_capacity(triangles.len() * 2),
             vertices,
         }
     }
 
     pub fn build(mut self) -> (Vec<Vector3<f32>>, Vec<Triangle>, Vec<BVHNode>) {
         self.create_leaf_node_from_triangles(0, self.triangles.len());
+        // push in dummy to make subsequent node-pairs reside in the same cache line
+        self.nodes.push(BVHNode::new_dummy());
         self.split_leaf_node_sah(0);
         (self.vertices,
          self.triangles.iter().map(BVHTriangle::to_tri).collect(),

@@ -116,6 +116,13 @@ impl BVHNode {
         }
     }
 
+    pub fn new_dummy() -> Self {
+        Self {
+            bounds: AABB::new(Vector3::zero(), Vector3::zero()),
+            is_leaf: 1, a: 0, b: 0
+        }
+    }
+
     pub fn convert_to_node(&mut self, right_node: u32, left_node: u32) {
         self.is_leaf = 0;
         self.a = right_node;
