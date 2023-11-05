@@ -1,3 +1,5 @@
+use std::os::raw::c_void;
+use image::{EncodableLayout, RgbImage};
 use crate::gl_wrapper::types::{TextureAttachment, TextureFilter, TextureFormat};
 
 fn gen_texture() -> u32 {
@@ -6,7 +8,7 @@ fn gen_texture() -> u32 {
     id
 }
 
-fn reformat(texture: u32, width: u32, height: u32, format: &TextureFormat) {
+fn reformat(texture: u32, width: u32, height: u32, format: &TextureFormat, data: *const c_void) {
     unsafe {
         gl::BindTexture(gl::TEXTURE_2D, texture);
         gl::TexImage2D(
@@ -18,7 +20,7 @@ fn reformat(texture: u32, width: u32, height: u32, format: &TextureFormat) {
             0,
             gl::RGB,
             gl::UNSIGNED_BYTE,
-            0 as *const _,
+            data,
         );
     }
 }
@@ -50,12 +52,27 @@ pub struct Texture {
 impl Texture {
     pub fn new(width: u32, height: u32, format: TextureFormat, filter: TextureFilter) -> Self {
         let texture = gen_texture();
-        reformat(texture, width, height, &format);
+        reformat(texture, width, height, &format, 0 as *const _);
         change_filter(texture, &filter);
         Self {
             texture,
             width,
             height,
+            format,
+            filter,
+        }
+    }
+    pub fn from_data(format: TextureFormat, filter: TextureFilter, data: &RgbImage) -> Self {
+        let texture = gen_texture();
+        reformat(
+            texture, data.width(), data.height(), &format,
+            data.as_bytes().as_ptr() as *const _
+        );
+        change_filter(texture, &filter);
+        Self {
+            texture,
+            width: data.width(),
+            height: data.height(),
             format,
             filter,
         }
@@ -77,7 +94,7 @@ impl Texture {
 
     pub fn reformat(&mut self, width: u32, height: u32, format: TextureFormat) {
         if self.width != width || self.height != height || self.format != format {
-            reformat(self.texture, width, height, &format);
+            reformat(self.texture, width, height, &format, 0 as *const _);
             self.width = width;
             self.height = height;
             self.format = format;
@@ -86,7 +103,7 @@ impl Texture {
 
     pub fn resize(&mut self, width: u32, height: u32) {
         if self.width != width || self.height != height {
-            reformat(self.texture, width, height, &self.format);
+            reformat(self.texture, width, height, &self.format, 0 as *const _);
             self.width = width;
             self.height = height;
         }

@@ -1,6 +1,7 @@
 use crate::util::error::ResourceError;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
+use image::DynamicImage;
 
 pub struct Resource {
     root_path: PathBuf,
@@ -30,5 +31,9 @@ impl Resource {
     pub fn read_file(&self, resource_name: &str) -> Result<String, ResourceError> {
         fs::read_to_string(Self::resource_name_to_path(&self.root_path, resource_name))
             .map_err(|e| ResourceError::Io(e))
+    }
+
+    pub fn read_image_file(&self, resource_name: &str) -> Result<DynamicImage, ResourceError> {
+        Ok(image::open(Self::resource_name_to_path(&self.root_path, resource_name))?)
     }
 }

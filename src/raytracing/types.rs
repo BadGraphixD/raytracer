@@ -4,11 +4,17 @@ pub struct Triangle {
     pub p0: u32,
     pub p1: u32,
     pub p2: u32,
+    pub t0: u32,
+    pub t1: u32,
+    pub t2: u32,
+    pub n0: u32,
+    pub n1: u32,
+    pub n2: u32,
 }
 
 impl Triangle {
-    pub fn new(p0: u32, p1: u32, p2: u32) -> Self {
-        Self { p0, p1, p2 }
+    pub fn new(p0: u32, p1: u32, p2: u32, t0: u32, t1: u32, t2: u32, n0: u32, n1: u32, n2: u32) -> Self {
+        Self { p0, p1, p2, t0, t1, t2, n0, n1, n2 }
     }
 }
 

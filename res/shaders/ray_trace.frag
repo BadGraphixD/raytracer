@@ -4,8 +4,9 @@ in vec2 fragPos;
 out vec4 fragCol;
 
 uniform sampler2D dirTex;
+uniform sampler2D modelAlbedo;
 uniform vec3 org;
-uniform bool hasUVs;
+uniform bool hasTexCoords;
 uniform bool hasNormals;
 
 const float EPSILON = 0.000001;
@@ -28,6 +29,8 @@ struct Node {
 
 struct Triangle {
     uint p0, p1, p2;
+    uint t0, t1, t2;
+    uint n0, n1, n2;
 };
 
 struct NodeStack {
@@ -47,8 +50,8 @@ layout (std430, binding = 2) buffer positionBuffer {
     float positions[];
 };
 
-layout (std430, binding = 3) buffer uvBuffer {
-    float uvs[];
+layout (std430, binding = 3) buffer texCoordBuffer {
+    float texCoords[];
 };
 
 layout (std430, binding = 4) buffer normalBuffer {
@@ -97,6 +100,13 @@ vec3 fetchPosition(uint index) {
         positions[index * 3 + 0],
         positions[index * 3 + 1],
         positions[index * 3 + 2]
+    );
+}
+
+vec2 fetchTexCoord(uint index) {
+    return vec2(
+        texCoords[index * 2 + 0],
+        texCoords[index * 2 + 1]
     );
 }
 
@@ -149,7 +159,6 @@ void traverseBVH(const Ray ray, inout float t, inout uint triangleIdx, inout vec
                 if (dist0 != 1e30) stack.nodes[stack.idx++] = node.a;
                 if (dist1 != 1e30) stack.nodes[stack.idx++] = node.b;
             }
-
             /*
             // todo: test if this is faster
             // note: probably not
@@ -166,13 +175,25 @@ void traverseBVH(const Ray ray, inout float t, inout uint triangleIdx, inout vec
     }
 }
 
+vec2 triangleTexCoord(const uint idx, const vec2 uv) {
+    if (hasTexCoords) {
+        vec2 t0 = fetchTexCoord(triangles[idx].t0);
+        vec2 t1 = fetchTexCoord(triangles[idx].t1);
+        vec2 t2 = fetchTexCoord(triangles[idx].t2);
+        float w = 1 - uv.x - uv.y;
+        return t1 * uv.x + t2 * uv.y + t0 * w;
+    } else {
+        return vec2(0, 0);
+    }
+}
+
 vec3 triangleNormal(const uint idx, const vec2 uv) {
     if (hasNormals) {
-        // todo: not working
-        vec3 n0 = fetchNormal(triangles[idx].p0);
-        vec3 n1 = fetchNormal(triangles[idx].p1);
-        vec3 n2 = fetchNormal(triangles[idx].p2);
-        return n0;
+        vec3 n0 = fetchNormal(triangles[idx].n0);
+        vec3 n1 = fetchNormal(triangles[idx].n1);
+        vec3 n2 = fetchNormal(triangles[idx].n2);
+        float w = 1 - uv.x - uv.y;
+        return n1 * uv.x + n2 * uv.y + n0 * w;
     } else {
         vec3 v0 = fetchPosition(triangles[idx].p0);
         vec3 v1 = fetchPosition(triangles[idx].p1);
@@ -192,9 +213,14 @@ void main() {
     traverseBVH(Ray(org, dir, 1 / dir), t, triangleIdx, uv, intersections);
 
     vec3 normal = triangleNormal(triangleIdx, uv);
+    vec2 texCoord = triangleTexCoord(triangleIdx, uv);
     vec3 reflected = reflect(dir, normal);
 
-    fragCol = t > 1000 ? vec4(dir, 1) : vec4(normal, 1);
+    vec3 albedo = texture(modelAlbedo, vec2(texCoord.x, -texCoord.y)).xyz;
+
+    fragCol = t > 1000 ? vec4(dir, 1) : vec4(albedo, 1);
+    //fragCol = t > 1000 ? vec4(dir, 1) : vec4(texCoord, 0, 1);
+    //fragCol = t > 1000 ? vec4(dir, 1) : vec4(normal, 1);
     //fragCol = t > 1000 ? vec4(dir, 1) : vec4(uv, 0, 1);
     //fragCol = t > 1000 ? vec4(dir, 1) : vec4(reflected, 1);
     //fragCol = vec4(intersections / 100.0, 0, t > 1000 ? 0 : 1, 1);

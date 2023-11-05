@@ -22,11 +22,12 @@ fn main() {
     // create window
     let mut window = Window::new(1000, 800, "Raytracing :)").expect("Failed to create window!");
     let mut camera = Camera::new_default();
-    let camera_controller = CameraController::new(10.0, 8.0);
+    let camera_controller = CameraController::new(1.0, 8.0);
 
     // load resources
     let shaders = Resource::from_relative_exe_path("res/shaders").unwrap();
     let models = Resource::from_relative_exe_path("res/models").unwrap();
+    let textures = Resource::from_relative_exe_path("res/textures").unwrap();
 
     // load shaders
     let default_vert = Shader::new(
@@ -65,7 +66,7 @@ fn main() {
         .unwrap();
 
     // load models
-    let model = ModelParser::parse(models.read_file("dragon.obj").unwrap()).unwrap();
+    let model = ModelParser::parse(models.read_file("f16.obj").unwrap()).unwrap();
 
     let start = SystemTime::now();
     let (model_nodes, model) = BVHBuilder::new(model).build();
@@ -79,8 +80,9 @@ fn main() {
     let ray_create_front_loc = ray_create_program.uniform_location("front");
 
     let ray_trace_dir_tex_loc = ray_trace_program.uniform_location("dirTex");
+    let ray_trace_model_albedo_tex_loc = ray_trace_program.uniform_location("modelAlbedo");
     let ray_trace_org_loc = ray_trace_program.uniform_location("org");
-    let ray_trace_has_uvs_loc = ray_trace_program.uniform_location("hasUVs");
+    let ray_trace_has_tex_coords_loc = ray_trace_program.uniform_location("hasTexCoords");
     let ray_trace_has_normals_loc = ray_trace_program.uniform_location("hasNormals");
 
     let display_program_tex_loc = display_program.uniform_location("display");
@@ -106,6 +108,10 @@ fn main() {
     col_framebuffer.attach_texture(&col_texture, TextureAttachment::Color(0));
     col_framebuffer.bind_draw_buffers();
 
+    // create textures
+    let texture_data = textures.read_image_file("F16s.bmp").expect("Failed to load image data").into_rgb8();
+    let model_texture = Texture::from_data(TextureFormat::RGB8, TextureFilter::Linear, &texture_data);
+
     // create square geometry
     let (_vbo, _ibo, square_geometry) = GeometrySetBuilder::create_square_geometry();
 
@@ -118,8 +124,8 @@ fn main() {
     node_ssbo.buffer_data(&model_nodes);
     triangle_ssbo.buffer_data(model.triangles());
     position_ssbo.buffer_data(model.positions());
-    if let Some(model_uvs) = model.uvs() { uv_ssbo.buffer_data(model_uvs) }
-    if let Some(model_normals) = model.normals() { uv_ssbo.buffer_data(model_normals) }
+    if let Some(model_uvs) = model.tex_coords() { uv_ssbo.buffer_data(model_uvs) }
+    if let Some(model_normals) = model.normals() { normal_ssbo.buffer_data(model_normals) }
 
     while !window.should_close() {
         // handle events
@@ -149,14 +155,16 @@ fn main() {
         col_framebuffer.bind();
         ray_trace_program.bind();
         ray_dir_texture.bind_to_slot(0);
+        model_texture.bind_to_slot(1);
         ray_trace_program.set_uniform_texture(ray_trace_dir_tex_loc, 0);
+        ray_trace_program.set_uniform_texture(ray_trace_model_albedo_tex_loc, 1);
         ray_trace_program.set_uniform_3f(ray_trace_org_loc, cvv.pos);
-        ray_trace_program.set_uniform_1b(ray_trace_has_uvs_loc, model.has_uvs());
+        ray_trace_program.set_uniform_1b(ray_trace_has_tex_coords_loc, model.has_tex_coords());
         ray_trace_program.set_uniform_1b(ray_trace_has_normals_loc, model.has_normals());
         node_ssbo.bind_to_slot(0);
         triangle_ssbo.bind_to_slot(1);
         position_ssbo.bind_to_slot(2);
-        if model.has_uvs() { uv_ssbo.bind_to_slot(3) }
+        if model.has_tex_coords() { uv_ssbo.bind_to_slot(3) }
         if model.has_normals() { normal_ssbo.bind_to_slot(4) }
         square_geometry.draw();
 
