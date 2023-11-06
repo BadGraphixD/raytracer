@@ -67,6 +67,7 @@ fn main() {
 
     // load models
     let model = ModelParser::parse(models.read_file("f16.obj").unwrap()).unwrap();
+    model.print_info();
 
     let start = SystemTime::now();
     let (model_nodes, model) = BVHBuilder::new(model).build();

@@ -4,17 +4,11 @@ pub struct Triangle {
     pub p0: u32,
     pub p1: u32,
     pub p2: u32,
-    pub t0: u32,
-    pub t1: u32,
-    pub t2: u32,
-    pub n0: u32,
-    pub n1: u32,
-    pub n2: u32,
 }
 
 impl Triangle {
-    pub fn new(p0: u32, p1: u32, p2: u32, t0: u32, t1: u32, t2: u32, n0: u32, n1: u32, n2: u32) -> Self {
-        Self { p0, p1, p2, t0, t1, t2, n0, n1, n2 }
+    pub fn new(p0: u32, p1: u32, p2: u32) -> Self {
+        Self { p0, p1, p2 }
     }
 }
 
@@ -145,5 +139,34 @@ impl BVHNode {
 
     pub fn triangle_count(&self) -> u32 {
         self.b
+    }
+}
+
+#[derive(Clone, Hash, Eq, PartialEq)]
+pub struct IndexBundle {
+    pub pos_idx: u32,
+    pub tex_idx: u32,
+    pub nor_idx: u32,
+}
+
+impl IndexBundle {
+    pub fn new(input: &Vec<&str>) -> Self {
+        let mut ib = Self::new_default();
+        if input.len() > 0 && !input[0].is_empty() { ib.pos_idx = Self::parse(input[0]) }
+        if input.len() > 1 && !input[1].is_empty() { ib.tex_idx = Self::parse(input[1]) }
+        if input.len() > 2 && !input[2].is_empty() { ib.nor_idx = Self::parse(input[2]) }
+        ib
+    }
+
+    pub fn new_default() -> Self {
+        Self {
+            pos_idx: u32::MAX,
+            tex_idx: u32::MAX,
+            nor_idx: u32::MAX,
+        }
+    }
+
+    pub fn parse(str: &str) -> u32 {
+        str.trim().parse::<u32>().unwrap() - 1
     }
 }

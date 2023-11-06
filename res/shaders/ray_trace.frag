@@ -29,8 +29,6 @@ struct Node {
 
 struct Triangle {
     uint p0, p1, p2;
-    uint t0, t1, t2;
-    uint n0, n1, n2;
 };
 
 struct NodeStack {
@@ -177,9 +175,9 @@ void traverseBVH(const Ray ray, inout float t, inout uint triangleIdx, inout vec
 
 vec2 triangleTexCoord(const uint idx, const vec2 uv) {
     if (hasTexCoords) {
-        vec2 t0 = fetchTexCoord(triangles[idx].t0);
-        vec2 t1 = fetchTexCoord(triangles[idx].t1);
-        vec2 t2 = fetchTexCoord(triangles[idx].t2);
+        vec2 t0 = fetchTexCoord(triangles[idx].p0);
+        vec2 t1 = fetchTexCoord(triangles[idx].p1);
+        vec2 t2 = fetchTexCoord(triangles[idx].p2);
         float w = 1 - uv.x - uv.y;
         return t1 * uv.x + t2 * uv.y + t0 * w;
     } else {
@@ -189,9 +187,9 @@ vec2 triangleTexCoord(const uint idx, const vec2 uv) {
 
 vec3 triangleNormal(const uint idx, const vec2 uv) {
     if (hasNormals) {
-        vec3 n0 = fetchNormal(triangles[idx].n0);
-        vec3 n1 = fetchNormal(triangles[idx].n1);
-        vec3 n2 = fetchNormal(triangles[idx].n2);
+        vec3 n0 = fetchNormal(triangles[idx].p0);
+        vec3 n1 = fetchNormal(triangles[idx].p1);
+        vec3 n2 = fetchNormal(triangles[idx].p2);
         float w = 1 - uv.x - uv.y;
         return n1 * uv.x + n2 * uv.y + n0 * w;
     } else {
