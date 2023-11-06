@@ -22,7 +22,7 @@ fn main() {
     // create window
     let mut window = Window::new(1000, 800, "Raytracing :)").expect("Failed to create window!");
     let mut camera = Camera::new_default();
-    let camera_controller = CameraController::new(1.0, 8.0);
+    let camera_controller = CameraController::new(10.0, 8.0);
 
     // load resources
     let shaders = Resource::from_relative_exe_path("res/shaders").unwrap();
@@ -66,7 +66,7 @@ fn main() {
         .unwrap();
 
     // load models
-    let model = ModelParser::parse(models.read_file("f16.obj").unwrap()).unwrap();
+    let model = ModelParser::parse(models.read_file("dragon.obj").unwrap()).unwrap();
     model.print_info();
 
     let start = SystemTime::now();

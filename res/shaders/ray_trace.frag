@@ -191,13 +191,28 @@ vec3 triangleNormal(const uint idx, const vec2 uv) {
         vec3 n1 = fetchNormal(triangles[idx].p1);
         vec3 n2 = fetchNormal(triangles[idx].p2);
         float w = 1 - uv.x - uv.y;
-        return n1 * uv.x + n2 * uv.y + n0 * w;
+        return normalize(n1 * uv.x + n2 * uv.y + n0 * w);
     } else {
         vec3 v0 = fetchPosition(triangles[idx].p0);
         vec3 v1 = fetchPosition(triangles[idx].p1);
         vec3 v2 = fetchPosition(triangles[idx].p2);
         return normalize(cross(v1 - v0, v2 - v0));
     }
+}
+
+const vec3 TOP_SKY = vec3(.5, .7, .9);
+const vec3 BOTTOM_SKY = vec3(.2, .5, .8);
+const vec3 SUN_DIR = normalize(vec3(1, 2, 1));
+const vec3 SUN_COL = vec3(1, 0.97, 0.86);
+const float AMBIENT = 0.5;
+const float DIFFUSE = 0.8;
+const float SPECULAR = 0.4;
+const float SPEC_POW = 30.0;
+
+vec3 skybox(const vec3 dir) {
+    float sun_fac = clamp(pow(dot(dir, SUN_DIR), 200.0), 0, 1);
+    float sky_fac = (dir.y + 1) * .5;
+    return TOP_SKY * sky_fac + BOTTOM_SKY * (1 - sky_fac) + SUN_COL * sun_fac;
 }
 
 void main() {
@@ -210,18 +225,32 @@ void main() {
 
     traverseBVH(Ray(org, dir, 1 / dir), t, triangleIdx, uv, intersections);
 
-    vec3 normal = triangleNormal(triangleIdx, uv);
-    vec2 texCoord = triangleTexCoord(triangleIdx, uv);
-    vec3 reflected = reflect(dir, normal);
+    if (t < 1000) {
+        vec3 normal = triangleNormal(triangleIdx, uv);
+        vec2 texCoord = triangleTexCoord(triangleIdx, uv);
+        vec3 reflected = reflect(dir, normal);
 
-    vec3 albedo = texture(modelAlbedo, vec2(texCoord.x, -texCoord.y)).xyz;
+        float shadow_t = 1000000;
+        vec3 shadow_ray_dir = SUN_DIR;
+        Ray shadow_ray = Ray(
+            org + dir * t + normal * 0.001,
+            shadow_ray_dir, 1 / shadow_ray_dir
+        );
+        traverseBVH(shadow_ray, shadow_t, triangleIdx, uv, intersections);
+        bool shadow = shadow_t < 1000;
 
-    fragCol = t > 1000 ? vec4(dir, 1) : vec4(albedo, 1);
-    //fragCol = t > 1000 ? vec4(dir, 1) : vec4(texCoord, 0, 1);
-    //fragCol = t > 1000 ? vec4(dir, 1) : vec4(normal, 1);
-    //fragCol = t > 1000 ? vec4(dir, 1) : vec4(uv, 0, 1);
-    //fragCol = t > 1000 ? vec4(dir, 1) : vec4(reflected, 1);
-    //fragCol = vec4(intersections / 100.0, 0, t > 1000 ? 0 : 1, 1);
-    //fragCol = vec4(intersections / 100.0, 0, 0, 1);
-    //fragCol = t > 1000 ? vec4(dir, 1) : vec4(org + dir * t, 1);
+        vec3 albedo = texture(modelAlbedo, vec2(texCoord.x, -texCoord.y)).xyz;
+        vec3 ambient = albedo * skybox(normal) * AMBIENT;
+        vec3 diffuse = albedo * SUN_COL * clamp(dot(normal, SUN_DIR), 0, 1) * DIFFUSE;
+        vec3 specular = SUN_COL * clamp(pow(dot(reflected, SUN_DIR), SPEC_POW), 0, 1) * SPECULAR;
+
+        if (shadow) {
+            diffuse *= 0;
+            specular *= 0;
+        }
+
+        fragCol = vec4(ambient + diffuse + specular, 1);
+    } else {
+        fragCol = vec4(skybox(dir), 1);
+    }
 }
