@@ -6,8 +6,9 @@ use crate::gl_wrapper::texture::Texture;
 use crate::gl_wrapper::types::{TextureAttachment, TextureFilter, TextureFormat};
 use crate::raytracing::bvh::BVHBuilder;
 use crate::rendering::camera::Camera;
+use crate::rendering::material::MaterialManager;
 use crate::util::camera_controller::CameraController;
-use crate::util::model_parser::ModelParser;
+use crate::util::model_parser::ResourceParser;
 use crate::util::resource::Resource;
 use crate::window::window::Window;
 
@@ -50,8 +51,12 @@ fn main() {
         .build().unwrap();
 
     // load models
-    let model = ModelParser::parse(models.read_file("armadillo_midres.obj").unwrap()).unwrap();
+    let model = ResourceParser::parse_model(models.read_file("f16.obj").unwrap()).unwrap();
     let (model_nodes, model) = BVHBuilder::new(model).build();
+
+    // load materials
+    let mut mat_manager = MaterialManager::new();
+    mat_manager.load_libs(&models, model.get_material_libs()).expect("Failed to load material libs");
 
     // create frame buffers
     let mut ray_dir_framebuffer = Framebuffer::new();

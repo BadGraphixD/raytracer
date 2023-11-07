@@ -25,6 +25,9 @@ impl Model {
         self.triangles = triangles;
     }
 
+    pub fn get_material_libs(&self) -> &Vec<String> { &self.material_libs }
+    pub fn get_materials(&self) -> &Vec<String> { &self.materials }
+
     pub fn print_info(&self) {
         println!("--- Model Info ---");
         println!("  # Triangles: {}", self.triangles.len());

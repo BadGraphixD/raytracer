@@ -62,7 +62,7 @@ float intersectTriangle(const Ray ray, const vec3 p0, const vec3 p1, const vec3 
     a = dot(edge1, h);
 
     // ray must hit from the front
-    if (a < EPSILON) return -1;
+    if (abs(a) < EPSILON) return -1;
 
     f = 1.0 / a;
     s = ray.org - p0;
@@ -116,10 +116,10 @@ void traverseBVH(const Ray ray, inout float t, inout uint triangleIdx, inout vec
                 intersections++;
                 vec2 uv;
                 float new_t = intersectTriangle(ray,
-                fetchPosition(triangles[i].p0),
-                fetchPosition(triangles[i].p1),
-                fetchPosition(triangles[i].p2),
-                uv
+                    fetchPosition(triangles[i].p0),
+                    fetchPosition(triangles[i].p1),
+                    fetchPosition(triangles[i].p2),
+                    uv
                 );
                 if (new_t > EPSILON && new_t < t) {
                     triangleIdx = i;
@@ -203,7 +203,7 @@ void main() {
         float shadow_t = 1000000;
         vec3 shadow_ray_dir = SUN_DIR;
         Ray shadow_ray = Ray(
-            org + dir * t + normal * 0.001,
+            org + dir * t + normal * EPSILON,
             shadow_ray_dir, 1 / shadow_ray_dir
         );
         traverseBVH(shadow_ray, shadow_t, triangleIdx, uv, intersections);

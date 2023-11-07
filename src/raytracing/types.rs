@@ -1,5 +1,5 @@
 use cgmath::{Vector3, Zero};
-use crate::util::error::ModelParseError;
+use crate::util::error::ResourceParseError;
 
 pub struct Triangle {
     pub p0: u32,
@@ -151,7 +151,7 @@ pub struct IndexBundle {
 }
 
 impl IndexBundle {
-    pub fn new(input: &Vec<&str>) -> Result<Self, ModelParseError> {
+    pub fn new(input: &Vec<&str>) -> Result<Self, ResourceParseError> {
         let mut ib = Self::new_default();
         if input.len() > 0 && !input[0].is_empty() { ib.pos_idx = Self::parse(input[0])? }
         if input.len() > 1 && !input[1].is_empty() { ib.tex_idx = Self::parse(input[1])? }
@@ -173,8 +173,8 @@ impl IndexBundle {
         }
     }
 
-    pub fn parse(str: &str) -> Result<i32, ModelParseError> {
-        let idx = str.trim().parse::<i32>().map_err(|e| ModelParseError::ParseIntError(e, str.to_owned()))?;
+    pub fn parse(str: &str) -> Result<i32, ResourceParseError> {
+        let idx = str.trim().parse::<i32>().map_err(|e| ResourceParseError::ParseIntError(e, str.to_owned()))?;
         Ok(if idx > 0 { idx - 1 } else { idx })
     }
 }
