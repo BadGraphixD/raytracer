@@ -1,3 +1,4 @@
+use std::num::ParseIntError;
 use image::ImageError;
 
 #[derive(Debug)]
@@ -10,8 +11,8 @@ pub enum WindowError {
 pub enum ResourceError {
     FailedToGetExePath,
     FileContainsNil(String),
-    Io(std::io::Error),
     ImageError(ImageError),
+    Io(std::io::Error),
 }
 
 impl From<std::io::Error> for ResourceError {
@@ -38,4 +39,9 @@ pub enum FramebufferError {
 }
 
 #[derive(Debug)]
-pub enum ModelParseError {}
+pub enum ModelParseError {
+    ParseIntError(ParseIntError, String),
+    InvalidIndexLineArgCount(usize, String),
+    InvalidStringLineArgCount(usize, String),
+    InvalidLineArgCount(usize, String),
+}

@@ -1,5 +1,6 @@
 use crate::gl_wrapper::buffer::{IndexBuffer, VertexBuffer};
 use crate::gl_wrapper::types::{AttributeType, Primitive};
+use crate::rendering::model::Model;
 
 fn gen_vertex_array() -> u32 {
     let mut id: u32 = 0;
@@ -124,7 +125,7 @@ impl<'a> GeometrySetBuilder<'a> {
         mesh
     }
 
-    pub fn create_square_geometry() -> (VertexBuffer, IndexBuffer, GeometrySet) {
+    pub fn create_square_geometry() -> (GeometrySet, IndexBuffer, VertexBuffer) {
         const VERTICES: [f32; 8] = [-1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0, -1.0];
         const INDICES: [i32; 6] = [0, 2, 1, 0, 2, 3];
 
@@ -138,6 +139,38 @@ impl<'a> GeometrySetBuilder<'a> {
             .add_attribute(2, AttributeType::Float)
             .build(&ibo, Primitive::Triangles);
 
-        (vbo, ibo, gs)
+        (gs, ibo, vbo)
+    }
+
+    pub fn from_model(model: &Model) -> (GeometrySet, IndexBuffer, Vec<VertexBuffer>) {
+        let mut ibo = IndexBuffer::new();
+        let mut pos_vbo = VertexBuffer::new();
+        let mut tex_vbo = None;
+        let mut nor_vbo = None;
+
+        ibo.buffer_data(model.triangles());
+        pos_vbo.buffer_data(model.positions());
+
+        let mut gsb = GeometrySetBuilder::new()
+            .add_buffer(&pos_vbo)
+            .add_attribute(3, AttributeType::Float);
+
+        if let Some(tex_coords) = model.tex_coords() {
+            tex_vbo = Some(VertexBuffer::new());
+            tex_vbo.as_mut().unwrap().buffer_data(tex_coords);
+            gsb = gsb.add_buffer(tex_vbo.as_ref().unwrap()).add_attribute(2, AttributeType::Float);
+        }
+        if let Some(normals) = model.normals() {
+            nor_vbo = Some(VertexBuffer::new());
+            nor_vbo.as_mut().unwrap().buffer_data(normals);
+            gsb = gsb.add_buffer(nor_vbo.as_ref().unwrap()).add_attribute(3, AttributeType::Float);
+        }
+
+        let gs = gsb.build(&ibo, Primitive::Triangles);
+        let mut vbos = vec![pos_vbo];
+        if let Some(tex_vbo) = tex_vbo { vbos.push(tex_vbo) }
+        if let Some(nor_vbo) = nor_vbo { vbos.push(nor_vbo) }
+
+        (gs, ibo, vbos)
     }
 }

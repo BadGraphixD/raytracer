@@ -1,5 +1,5 @@
 use crate::window::window::Window;
-use cgmath::{Angle, Deg, InnerSpace, Point3, Rad, Vector3};
+use cgmath::{Angle, Deg, InnerSpace, Matrix4, perspective, Point3, Rad, Vector3};
 use std::ops::{Add, Div, Mul};
 
 pub struct Camera {
@@ -64,6 +64,13 @@ impl Camera {
             pos: Vector3::new(self.position.x, self.position.y, self.position.z),
         }
     }
+
+    pub fn view_proj_matrices(&self, window: &Window) -> CameraViewProjMatrices {
+        CameraViewProjMatrices {
+            view: Matrix4::look_at_lh(self.position, self.position.add(self.direction), self.up),
+            proj: perspective(self.fov, window.aspect(), 0.1, 10000.0),
+        }
+    }
 }
 
 pub struct CameraViewVectors {
@@ -71,4 +78,9 @@ pub struct CameraViewVectors {
     pub up: Vector3<f32>,
     pub front: Vector3<f32>,
     pub pos: Vector3<f32>,
+}
+
+pub struct CameraViewProjMatrices {
+    pub view: Matrix4<f32>,
+    pub proj: Matrix4<f32>,
 }

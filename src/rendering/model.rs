@@ -91,8 +91,13 @@ impl ModelBuilder {
         let has_tex_coords = self.tex_coords.len() > 0;
         let has_normals = self.normals.len() > 0;
 
+        let pos_len = self.positions.len() as i32;
+        let tex_len = self.tex_coords.len() as i32;
+        let nor_len = self.normals.len() as i32;
+
         let mut new_idx = 0;
-        self.indices.into_iter().for_each(|ib| {
+        self.indices.into_iter().for_each(|mut ib| {
+            ib.normalize(pos_len, tex_len, nor_len);
             if let Some(idx) = bundle_map.get(&ib) {
                 new_indices.push(*idx);
             } else {

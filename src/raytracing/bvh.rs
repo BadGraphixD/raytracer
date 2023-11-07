@@ -58,18 +58,22 @@ impl BVHBuilder {
         (self.nodes, self.model)
     }
 
+    #[inline]
     fn fetch_position(&self, index: usize) -> &Vector3<f32> {
         &self.model.positions()[index]
     }
 
+    #[inline]
     fn fetch_triangle(&self, index: usize) -> &BVHTriangle {
         &self.triangles[index]
     }
 
+    #[inline]
     fn fetch_node(&self, index: usize) -> &BVHNode {
         &self.nodes[index]
     }
 
+    #[inline]
     fn swap_triangles(&mut self, first: usize, second: usize) {
         self.triangles.swap(first, second);
     }
@@ -102,6 +106,7 @@ impl BVHBuilder {
         ));
     }
 
+    #[inline]
     fn convert_leaf_to_node(&mut self, node_idx: usize, right_node: usize, left_node: usize) {
         self.nodes[node_idx].convert_to_node(right_node as u32, left_node as u32);
     }

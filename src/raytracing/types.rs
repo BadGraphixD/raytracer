@@ -1,4 +1,5 @@
 use cgmath::{Vector3, Zero};
+use crate::util::error::ModelParseError;
 
 pub struct Triangle {
     pub p0: u32,
@@ -144,29 +145,36 @@ impl BVHNode {
 
 #[derive(Clone, Hash, Eq, PartialEq)]
 pub struct IndexBundle {
-    pub pos_idx: u32,
-    pub tex_idx: u32,
-    pub nor_idx: u32,
+    pub pos_idx: i32,
+    pub tex_idx: i32,
+    pub nor_idx: i32,
 }
 
 impl IndexBundle {
-    pub fn new(input: &Vec<&str>) -> Self {
+    pub fn new(input: &Vec<&str>) -> Result<Self, ModelParseError> {
         let mut ib = Self::new_default();
-        if input.len() > 0 && !input[0].is_empty() { ib.pos_idx = Self::parse(input[0]) }
-        if input.len() > 1 && !input[1].is_empty() { ib.tex_idx = Self::parse(input[1]) }
-        if input.len() > 2 && !input[2].is_empty() { ib.nor_idx = Self::parse(input[2]) }
-        ib
+        if input.len() > 0 && !input[0].is_empty() { ib.pos_idx = Self::parse(input[0])? }
+        if input.len() > 1 && !input[1].is_empty() { ib.tex_idx = Self::parse(input[1])? }
+        if input.len() > 2 && !input[2].is_empty() { ib.nor_idx = Self::parse(input[2])? }
+        Ok(ib)
+    }
+
+    pub fn normalize(&mut self, pos_len: i32, tex_len: i32, nor_len: i32) {
+        if self.pos_idx < 0 { self.pos_idx += pos_len }
+        if self.tex_idx < 0 { self.tex_idx += tex_len }
+        if self.nor_idx < 0 { self.nor_idx += nor_len }
     }
 
     pub fn new_default() -> Self {
         Self {
-            pos_idx: u32::MAX,
-            tex_idx: u32::MAX,
-            nor_idx: u32::MAX,
+            pos_idx: 0,
+            tex_idx: 0,
+            nor_idx: 0,
         }
     }
 
-    pub fn parse(str: &str) -> u32 {
-        str.trim().parse::<u32>().unwrap() - 1
+    pub fn parse(str: &str) -> Result<i32, ModelParseError> {
+        let idx = str.trim().parse::<i32>().map_err(|e| ModelParseError::ParseIntError(e, str.to_owned()))?;
+        Ok(if idx > 0 { idx - 1 } else { idx })
     }
 }

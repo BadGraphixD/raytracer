@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::gl_wrapper::types::ShaderType;
 use crate::util::error::ShaderError;
 use cgmath::Vector3;
@@ -94,6 +95,14 @@ impl Shader {
             Err(err) => Err(ShaderError::CompileError(err)),
         }
     }
+
+    pub fn new_vertex(source: String) -> Result<Self, ShaderError> {
+        Self::new(ShaderType::VertexShader, source)
+    }
+
+    pub fn new_fragment(source: String) -> Result<Self, ShaderError> {
+        Self::new(ShaderType::FragmentShader, source)
+    }
 }
 
 impl Drop for Shader {
@@ -104,12 +113,14 @@ impl Drop for Shader {
 
 pub struct ShaderProgram {
     id: u32,
+    uniform_locations: HashMap<String, i32>,
 }
 
 impl ShaderProgram {
     pub fn new() -> Self {
         Self {
             id: unsafe { gl::CreateProgram() },
+            uniform_locations: HashMap::new(),
         }
     }
 
@@ -120,25 +131,30 @@ impl ShaderProgram {
         unsafe { gl::UseProgram(0) }
     }
 
-    pub fn uniform_location(&self, name: &str) -> i32 {
-        let name_cstring = CString::new(name).unwrap();
-        unsafe { gl::GetUniformLocation(self.id, name_cstring.as_ptr()) }
+    pub fn set_uniform_texture(&mut self, name: &str, texture: i32) {
+        unsafe { gl::Uniform1i(self.uniform_location(name), texture) }
     }
 
-    pub fn set_uniform_texture(&self, location: i32, texture: i32) {
-        unsafe { gl::Uniform1i(location, texture) }
+    pub fn set_uniform_3f(&mut self, name: &str, v: Vector3<f32>) {
+        unsafe { gl::Uniform3f(self.uniform_location(name), v[0], v[1], v[2]) }
     }
 
-    pub fn set_uniform_3f(&self, location: i32, v: Vector3<f32>) {
-        unsafe { gl::Uniform3f(location, v[0], v[1], v[2]) }
+    pub fn set_uniform_1i(&mut self, name: &str, i: i32) {
+        unsafe { gl::Uniform1i(self.uniform_location(name), i) }
     }
 
-    pub fn set_uniform_1i(&self, location: i32, i: i32) {
-        unsafe { gl::Uniform1i(location, i) }
+    pub fn set_uniform_1b(&mut self, name: &str, b: bool) {
+        unsafe { gl::Uniform1i(self.uniform_location(name), b as i32) }
     }
 
-    pub fn set_uniform_1b(&self, location: i32, b: bool) {
-        unsafe { gl::Uniform1i(location, b as i32) }
+    pub fn uniform_location(&mut self, name: &str) -> i32 {
+        if let Some(loc) = self.uniform_locations.get(name) { *loc }
+        else {
+            let name_cstring = CString::new(name).unwrap();
+            let loc = unsafe { gl::GetUniformLocation(self.id, name_cstring.as_ptr()) };
+            self.uniform_locations.insert(name.to_owned(), loc);
+            loc
+        }
     }
 }
 
