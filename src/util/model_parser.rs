@@ -110,7 +110,7 @@ impl ResourceParser {
         let values: Vec<&str> = str.split(' ').filter(|s| !s.is_empty()).collect();
         let l = values.len();
         if l != 2 { Err(ResourceParseError::InvalidStringLineArgCount(l, str.to_owned())) }
-        else { Ok(values[1].to_owned()) }
+        else { Ok(values[1].trim().to_owned()) }
     }
 
     fn parse_line<R: RangeBounds<usize>>(str: &str, len: R) -> Result<Vec<f32>, ResourceParseError> {
