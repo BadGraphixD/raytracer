@@ -24,6 +24,7 @@ pub enum ResourceParseError {
 #[derive(Debug)]
 pub enum ResourceError {
     FailedToGetExePath,
+    ModelNotLoaded { name: String },
     ResourceLoadError { e: ResourceLoadError, file_name: String },
     ResourceParseError { e: ResourceParseError, line: u32, file_name: String },
     ShaderError { e: ShaderError, file_name: String },
