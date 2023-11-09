@@ -7,6 +7,7 @@ struct BVHTriangle {
     p0: usize,
     p1: usize,
     p2: usize,
+    mat_idx: u32,
     centroid: [f32; 3],
 }
 
@@ -22,6 +23,7 @@ impl BVHTriangle {
             p0: triangle.p0 as usize,
             p1: triangle.p1 as usize,
             p2: triangle.p2 as usize,
+            mat_idx: triangle.mat_idx,
             centroid: [ centroid.x, centroid.y, centroid.z ]
         }
     }
@@ -30,6 +32,7 @@ impl BVHTriangle {
             p0: self.p0 as u32,
             p1: self.p1 as u32,
             p2: self.p2 as u32,
+            mat_idx: self.mat_idx,
         }
     }
 }

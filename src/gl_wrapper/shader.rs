@@ -4,6 +4,7 @@ use crate::util::error::ShaderError;
 use cgmath::Vector3;
 use gl::types::GLchar;
 use std::ffi::CString;
+use std::sync::Arc;
 
 fn create_shader(r#type: u32, source: String) -> Result<u32, String> {
     unsafe {
@@ -164,24 +165,23 @@ impl Drop for ShaderProgram {
     }
 }
 
-pub struct ShaderProgramBuilder<'a> {
-    shaders: Vec<&'a Shader>,
+pub struct ShaderProgramBuilder {
+    shaders: Vec<Arc<Shader>>,
 }
 
-impl<'a> ShaderProgramBuilder<'a> {
+impl ShaderProgramBuilder {
     pub fn new() -> Self {
         Self { shaders: vec![] }
     }
 
-    pub fn add_shader(mut self, shader: &'a Shader) -> Self {
+    pub fn add_shader(mut self, shader: Arc<Shader>) -> Self {
         self.shaders.push(shader);
         self
     }
 
     pub fn build(self) -> Result<ShaderProgram, ShaderError> {
         let program = ShaderProgram::new();
-        self.shaders
-            .iter()
+        self.shaders.iter()
             .for_each(|shader| unsafe { gl::AttachShader(program.id, shader.id) });
         match link_program(program.id) {
             Ok(_) => Ok(program),

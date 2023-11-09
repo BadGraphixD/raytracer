@@ -5,7 +5,7 @@ use crate::gl_wrapper::texture::Texture;
 use crate::gl_wrapper::types::{TextureAttachment, TextureFilter, TextureFormat};
 use crate::rendering::camera::Camera;
 use crate::resource::resource_manager::ResourceManager;
-use crate::util::camera_controller::CameraController;
+use rendering::camera_controller::CameraController;
 use crate::window::window::Window;
 
 pub mod gl_wrapper;
@@ -21,29 +21,18 @@ fn main() {
     let mut camera = Camera::new_default();
     let camera_controller = CameraController::new(1.0, 8.0);
 
-    // config
-    let model_name = "f16.obj";
-    let ray_create_shader_names = ("quad.vert", "ray_create.frag");
-    let ray_trace_shader_names = ("quad.vert", "ray_trace_and_shade.frag");
-    let display_shader_names = ("quad.vert", "display.frag");
-
     // load resources
     let mut resource_manager = ResourceManager::new("res/models", "res/textures", "res/shaders").expect("Failed to create resource manager");
 
-    resource_manager.load_model(model_name).expect("Failed to load model resources");
+    let model = resource_manager.get_model("f16.obj").expect("Failed to load model resources");
+    model.lock().unwrap().build_bvh();
 
-    resource_manager.load_shader_program(ray_create_shader_names).expect("Failed to load shader");
-    resource_manager.load_shader_program(ray_trace_shader_names).expect("Failed to load shader");
-    resource_manager.load_shader_program(display_shader_names).expect("Failed to load shader");
+    let ray_create_program = resource_manager.create_shader_program("rayCreate", "quad.vert", "ray_create.frag").expect("Failed to load shader");
+    let ray_trace_program = resource_manager.create_shader_program("rayTrace", "quad.vert", "ray_trace_and_shade.frag").expect("Failed to load shader");
+    let display_program = resource_manager.create_shader_program("display", "quad.vert", "display.frag").expect("Failed to load shader");
 
-    resource_manager.build_model_bvh(model_name).expect("Failed to build model bvh");
-
-    let model_bvh = resource_manager.get_model_bvh(model_name).unwrap();
-    let model = resource_manager.get_model(model_name).unwrap();
-    let model_texture = resource_manager.get_texture("F16s.bmp").expect("Texture not present");
-    let ray_create_program = resource_manager.get_shader_program(ray_create_shader_names).unwrap();
-    let ray_trace_program = resource_manager.get_shader_program(ray_trace_shader_names).unwrap();
-    let display_program = resource_manager.get_shader_program(display_shader_names).unwrap();
+    let model_texture1 = resource_manager.get_texture("F16s.bmp").expect("Texture not present");
+    let model_texture2 = resource_manager.get_texture("F16t.bmp").expect("Texture not present");
 
     // create frame buffers
     let mut ray_dir_framebuffer = Framebuffer::new();
@@ -74,11 +63,11 @@ fn main() {
     let position_ssbo = ShaderStorageBuffer::new();
     let tex_coord_ssbo = ShaderStorageBuffer::new();
     let normal_ssbo = ShaderStorageBuffer::new();
-    node_ssbo.buffer_data(model_bvh.data());
-    triangle_ssbo.buffer_data(model.triangles());
-    position_ssbo.buffer_data(model.positions());
-    if let Some(model_uvs) = model.tex_coords() { tex_coord_ssbo.buffer_data(model_uvs) }
-    if let Some(model_normals) = model.normals() { normal_ssbo.buffer_data(model_normals) }
+    node_ssbo.buffer_data(model.lock().unwrap().get_bvh().unwrap().data());
+    triangle_ssbo.buffer_data(model.lock().unwrap().triangles());
+    position_ssbo.buffer_data(model.lock().unwrap().positions());
+    if let Some(model_uvs) = model.lock().unwrap().tex_coords() { tex_coord_ssbo.buffer_data(model_uvs) }
+    if let Some(model_normals) = model.lock().unwrap().normals() { normal_ssbo.buffer_data(model_normals) }
 
     while !window.should_close() {
         // handle events
@@ -99,26 +88,28 @@ fn main() {
 
         // create rays
         ray_dir_framebuffer.bind();
-        ray_create_program.bind();
-        ray_create_program.set_uniform_3f("right", cvv.right);
-        ray_create_program.set_uniform_3f("up", cvv.up);
-        ray_create_program.set_uniform_3f("front", cvv.front);
+        ray_create_program.lock().unwrap().bind();
+        ray_create_program.lock().unwrap().set_uniform_3f("right", cvv.right);
+        ray_create_program.lock().unwrap().set_uniform_3f("up", cvv.up);
+        ray_create_program.lock().unwrap().set_uniform_3f("front", cvv.front);
         quad_geometry.draw();
 
         // ray trace
         col_framebuffer.bind();
-        ray_trace_program.bind();
+        ray_trace_program.lock().unwrap().bind();
         ray_dir_texture.bind_to_slot(0);
-        ray_trace_program.set_uniform_texture("dirTex", 0);
-        ray_trace_program.set_uniform_3f("org", cvv.pos);
+        ray_trace_program.lock().unwrap().set_uniform_texture("dirTex", 0);
+        ray_trace_program.lock().unwrap().set_uniform_3f("org", cvv.pos);
 
         // ### if also shade ###
-        model_texture.bind_to_slot(1);
-        ray_trace_program.set_uniform_texture("modelAlbedo", 1);
-        ray_trace_program.set_uniform_1b("hasTexCoords", model.has_tex_coords());
-        ray_trace_program.set_uniform_1b("hasNormals", model.has_normals());
-        if model.has_tex_coords() { tex_coord_ssbo.bind_to_slot(3) }
-        if model.has_normals() { normal_ssbo.bind_to_slot(4) }
+        model_texture1.bind_to_slot(1);
+        model_texture2.bind_to_slot(2);
+        ray_trace_program.lock().unwrap().set_uniform_texture("modelAlbedo1", 1);
+        ray_trace_program.lock().unwrap().set_uniform_texture("modelAlbedo2", 2);
+        ray_trace_program.lock().unwrap().set_uniform_1b("hasTexCoords", model.lock().unwrap().has_tex_coords());
+        ray_trace_program.lock().unwrap().set_uniform_1b("hasNormals", model.lock().unwrap().has_normals());
+        if model.lock().unwrap().has_tex_coords() { tex_coord_ssbo.bind_to_slot(3) }
+        if model.lock().unwrap().has_normals() { normal_ssbo.bind_to_slot(4) }
         // ###
 
         node_ssbo.bind_to_slot(0);
@@ -128,9 +119,9 @@ fn main() {
 
         // render ray data onto screen
         col_framebuffer.unbind();
-        display_program.bind();
+        display_program.lock().unwrap().bind();
         col_texture.bind_to_slot(0);
-        display_program.set_uniform_texture("display", 0);
+        display_program.lock().unwrap().set_uniform_texture("display", 0);
         quad_geometry.draw();
 
         window.update();

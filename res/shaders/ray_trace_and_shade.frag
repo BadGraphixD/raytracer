@@ -8,7 +8,8 @@ in vec2 fragPos;
 out vec4 fragCol;
 
 uniform sampler2D dirTex;
-uniform sampler2D modelAlbedo;
+uniform sampler2D modelAlbedo1;
+uniform sampler2D modelAlbedo2;
 uniform vec3 org;
 uniform bool hasTexCoords;
 uniform bool hasNormals;
@@ -29,7 +30,7 @@ struct Node {
 };
 
 struct Triangle {
-    uint p0, p1, p2;
+    uint p0, p1, p2, matIdx;
 };
 
 struct NodeStack {
@@ -202,14 +203,15 @@ void main() {
 
         float shadow_t = 1000000;
         vec3 shadow_ray_dir = SUN_DIR;
+        uint shadow_triangleIdx = 0;
         Ray shadow_ray = Ray(
             org + dir * t + normal * 0.0001,
             shadow_ray_dir, 1 / shadow_ray_dir
         );
-        traverseBVH(shadow_ray, shadow_t, triangleIdx, uv, intersections);
+        traverseBVH(shadow_ray, shadow_t, shadow_triangleIdx, uv, intersections);
         bool shadow = shadow_t < 1000;
 
-        vec3 albedo = texture(modelAlbedo, vec2(texCoord.x, -texCoord.y)).xyz;
+        vec3 albedo = texture(triangles[triangleIdx].matIdx == 0 ? modelAlbedo1 : modelAlbedo2, vec2(texCoord.x, -texCoord.y)).xyz;
         vec3 ambient = albedo * skybox(normal) * AMBIENT;
         vec3 diffuse = albedo * SUN_COL * clamp(dot(normal, SUN_DIR), 0, 1) * DIFFUSE;
         vec3 specular = SUN_COL * clamp(pow(dot(reflected, SUN_DIR), SPEC_POW), 0, 1) * SPECULAR;

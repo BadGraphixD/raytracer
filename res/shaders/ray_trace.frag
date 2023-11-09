@@ -27,7 +27,7 @@ struct Node {
 };
 
 struct Triangle {
-    uint p0, p1, p2;
+    uint p0, p1, p2, matIdx;
 };
 
 struct Intersection {

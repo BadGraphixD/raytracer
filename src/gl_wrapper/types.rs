@@ -1,3 +1,5 @@
+use crate::util::error::ShaderError;
+
 pub enum Primitive {
     Points,
     LineStrip,
@@ -90,6 +92,16 @@ impl ShaderType {
             ShaderType::GeometryShader => gl::GEOMETRY_SHADER,
             ShaderType::FragmentShader => gl::FRAGMENT_SHADER,
         }
+    }
+
+    pub fn from_file_name(name: &str) -> Result<Self, ShaderError> {
+        if name.ends_with(".comp") { Ok(Self::ComputeShader) }
+        else if name.ends_with(".vert") { Ok(Self::VertexShader) }
+        else if name.ends_with(".tesc") { Ok(Self::TessCtrlShader) }
+        else if name.ends_with(".tese") { Ok(Self::TessEvalShader) }
+        else if name.ends_with(".geom") { Ok(Self::GeometryShader) }
+        else if name.ends_with(".frag") { Ok(Self::FragmentShader) }
+        else { Err(ShaderError::InvalidFileExtension(name.to_owned())) }
     }
 }
 

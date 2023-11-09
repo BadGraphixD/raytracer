@@ -34,19 +34,21 @@ impl Model {
     pub fn get_materials(&self) -> &Vec<String> { &self.materials }
 
     pub fn get_bvh(&self) -> Option<&BVH> { self.bvh.as_ref() }
+}
 
-    pub fn print_info(&self) {
-        println!("--- Model Info ---");
-        println!("  # Triangles: {}", self.triangles.len());
-        println!("  # Vertices: {}", self.positions.len());
-        println!("  Material Libs: {:?}", self.material_libs);
-        println!("  Materials: {:?}", self.materials);
-        println!("------------------");
+struct IBTriangle {
+    index_bundles: [IndexBundle; 3],
+    mat_idx: u32,
+}
+
+impl IBTriangle {
+    pub fn new(i0: IndexBundle, i1: IndexBundle, i2: IndexBundle, mat_idx: u32) -> Self {
+        Self { index_bundles: [i0, i1, i2], mat_idx, }
     }
 }
 
 pub struct ModelBuilder {
-    indices: Vec<IndexBundle>,
+    indices: Vec<IBTriangle>,
     positions: Vec<Vector3<f32>>,
     tex_coords: Vec<Vector2<f32>>,
     normals: Vec<Vector3<f32>>,
@@ -70,10 +72,8 @@ impl ModelBuilder {
         }
     }
 
-    pub fn add_indices(&mut self, i0: IndexBundle, i1: IndexBundle, i2: IndexBundle) {
-        self.indices.push(i0);
-        self.indices.push(i1);
-        self.indices.push(i2);
+    pub fn add_indices(&mut self, i0: IndexBundle, i1: IndexBundle, i2: IndexBundle, mat_idx: u32) {
+        self.indices.push(IBTriangle::new(i0, i1, i2, mat_idx));
     }
 
     pub fn add_position(&mut self, position: Vector3<f32>) { self.positions.push(position) }
@@ -91,9 +91,11 @@ impl ModelBuilder {
         }
     }
 
+    pub fn get_current_mat(&self) -> u32 { self.current_mat }
+
     pub fn build(self) -> Model {
         let mut bundle_map: HashMap<IndexBundle, u32> = HashMap::new();
-        let mut new_indices: Vec<u32> = vec![];
+        let mut new_triangles: Vec<Triangle> = vec![];
         let mut new_positions: Vec<Vector3<f32>> = vec![];
         let mut new_tex_coords: Vec<Vector2<f32>> = vec![];
         let mut new_normals: Vec<Vector3<f32>> = vec![];
@@ -106,25 +108,27 @@ impl ModelBuilder {
         let nor_len = self.normals.len() as i32;
 
         let mut new_idx = 0;
-        self.indices.into_iter().for_each(|mut ib| {
-            ib.normalize(pos_len, tex_len, nor_len);
-            if let Some(idx) = bundle_map.get(&ib) {
-                new_indices.push(*idx);
-            } else {
-                new_positions.push(self.positions[ib.pos_idx as usize]);
-                if has_tex_coords { new_tex_coords.push(self.tex_coords[ib.tex_idx as usize]) }
-                if has_normals { new_normals.push(self.normals[ib.nor_idx as usize]) }
-                new_indices.push(new_idx);
-                bundle_map.insert(ib, new_idx);
-                new_idx += 1;
-            }
+        self.indices.into_iter().for_each(|ib_tri| {
+            let indices = ib_tri.index_bundles.into_iter().map(|mut ib| {
+                ib.normalize(pos_len, tex_len, nor_len);
+                if let Some(idx) = bundle_map.get(&ib) { *idx }
+                else {
+                    new_positions.push(self.positions[ib.pos_idx as usize]);
+                    if has_tex_coords { new_tex_coords.push(self.tex_coords[ib.tex_idx as usize]) }
+                    if has_normals { new_normals.push(self.normals[ib.nor_idx as usize]) }
+                    bundle_map.insert(ib, new_idx);
+                    new_idx += 1;
+                    new_idx - 1
+                }
+            }).collect::<Vec<u32>>();
+            new_triangles.push(Triangle::new(indices[0], indices[1], indices[2], ib_tri.mat_idx));
         });
 
         let mut sorted_materials: Vec<String> = vec![String::new(); self.materials.len()];
         self.materials.into_iter().for_each(|(k, v)| sorted_materials[v as usize] = k);
 
         Model {
-            triangles: new_indices.chunks_exact(3).map(|i| Triangle::new(i[0], i[1], i[2])).collect(),
+            triangles: new_triangles,
             positions: new_positions,
             tex_coords: if has_tex_coords { Some(new_tex_coords) } else { None },
             normals: if has_normals { Some(new_normals) } else { None },

@@ -25,7 +25,7 @@ impl ResourceParser {
             if str.starts_with("f ") {
                 let values = Self::parse_index_line(str).map_err(|e| (e, i))?;
                 values.into_iter().for_each(|(i0, i1, i2)| {
-                    model_builder.add_indices(i0, i1, i2);
+                    model_builder.add_indices(i0, i1, i2, model_builder.get_current_mat());
                 });
             }
             if str.starts_with("v ") {
