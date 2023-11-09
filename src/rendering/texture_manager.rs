@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use crate::gl_wrapper::texture::Texture;
 use crate::gl_wrapper::types::{TextureFilter, TextureFormat};
 use crate::rendering::material::Material;
+use crate::resource::resource::Resource;
 use crate::util::error::ResourceError;
-use crate::util::resource::Resource;
 
 pub struct TextureManager {
     textures: HashMap<String, Texture>,
@@ -18,7 +18,7 @@ impl TextureManager {
         let texture_names = mat.get_texture_names();
         texture_names.into_iter().map(|name| {
             if !self.textures.contains_key(&name) {
-                let data = res.read_image_file(&name).map_err(|e| ResourceError::load_err(e, &name))?;
+                let data = res.read_image_file(&name)?;
                 let texture = Texture::from_data(
                     TextureFormat::RGBA8,
                     TextureFilter::Linear,

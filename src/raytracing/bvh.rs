@@ -34,14 +34,28 @@ impl BVHTriangle {
     }
 }
 
-pub struct BVHBuilder {
-    model: Model,
+pub struct BVH {
+    nodes: Vec<BVHNode>,
+}
+
+impl BVH {
+    pub fn new(nodes: Vec<BVHNode>) -> Self {
+        Self { nodes }
+    }
+
+    pub fn data(&self) -> &Vec<BVHNode> {
+        &self.nodes
+    }
+}
+
+pub struct BVHBuilder<'a> {
+    model: &'a mut Model,
     triangles: Vec<BVHTriangle>,
     nodes: Vec<BVHNode>,
 }
 
-impl BVHBuilder {
-    pub fn new(model: Model) -> Self {
+impl<'a> BVHBuilder<'a> {
+    pub fn new(model: &'a mut Model) -> Self {
         Self {
             triangles: model.triangles().iter().map(|tri| BVHTriangle::new(tri, model.positions())).collect(),
             nodes: Vec::with_capacity(model.triangles().len() * 2),
@@ -49,13 +63,13 @@ impl BVHBuilder {
         }
     }
 
-    pub fn build(mut self) -> (Vec<BVHNode>, Model) {
+    pub fn build(mut self) -> BVH {
         self.create_leaf_node_from_triangles(0, self.triangles.len());
         // push in dummy to make subsequent node-pairs reside in the same cache line
         self.nodes.push(BVHNode::new_dummy());
         self.split_leaf_node_sah(0);
         self.model.set_triangles(self.triangles.iter().map(BVHTriangle::to_tri).collect());
-        (self.nodes, self.model)
+        BVH::new(self.nodes)
     }
 
     #[inline]
@@ -111,31 +125,6 @@ impl BVHBuilder {
         self.nodes[node_idx].convert_to_node(right_node as u32, left_node as u32);
     }
 
-    #[deprecated]
-    #[allow(dead_code, deprecated)]
-    fn evaluate_split_sah(&self, node_idx: usize, axis: usize, split_pos: f32) -> f32 {
-        let mut left_aabb = AABBBuilder::new();
-        let mut right_aabb = AABBBuilder::new();
-        let mut left_count = 0;
-        let mut right_count = 0;
-        let node = self.fetch_node(node_idx);
-        for i in 0..node.triangle_count() {
-            let tri = self.fetch_triangle((node.first_triangle() + i) as usize);
-            if tri.centroid[axis] < split_pos {
-                left_count += 1;
-                left_aabb.include(self.fetch_position(tri.p0));
-                left_aabb.include(self.fetch_position(tri.p1));
-                left_aabb.include(self.fetch_position(tri.p2));
-            } else {
-                right_count += 1;
-                right_aabb.include(self.fetch_position(tri.p0));
-                right_aabb.include(self.fetch_position(tri.p1));
-                right_aabb.include(self.fetch_position(tri.p2));
-            }
-        }
-        left_count as f32 * left_aabb.area() + right_count as f32 * right_aabb.area()
-    }
-
     fn split_triangles_along_plane(&mut self, mut first: usize, count: usize, axis: usize, position: f32) -> usize {
         let mut last = first + count;
         while first < last {
@@ -147,59 +136,6 @@ impl BVHBuilder {
             }
         }
         first
-    }
-
-    // first version, uses naive sah evaluation algorithm to find best split pos
-    // construction time: slow O(N^2)
-    // traverse time: fast
-    #[deprecated]
-    #[allow(dead_code, deprecated)]
-    fn find_best_split_naive(&self, node_idx: usize, first_tri: usize, tri_count: usize) -> (usize, f32, f32) {
-        let mut best_axis = 0;
-        let mut best_split_pos = 0.0;
-        let mut lowest_cost = 1e30;
-        for axis in 0..3  {
-            for i in first_tri..(first_tri + tri_count) {
-                let tri = self.fetch_triangle(i);
-                let split_pos = tri.centroid[axis];
-                let cost = self.evaluate_split_sah(node_idx, axis, split_pos);
-                if cost < lowest_cost {
-                    best_axis = axis;
-                    best_split_pos = split_pos;
-                    lowest_cost = cost;
-                }
-            }
-        }
-        (best_axis, best_split_pos, lowest_cost)
-    }
-
-    // second version, uses a fixed amount of split planes and finds best split pos
-    // construction time: medium O(N)
-    // traverse time: fast
-    #[deprecated]
-    #[allow(dead_code, deprecated)]
-    fn find_best_split_step(&self, node_idx: usize, first_tri: usize, tri_count: usize) -> (usize, f32, f32) {
-        const STEPS: u32 = 50;
-        let mut best_axis = 0;
-        let mut best_split_pos = 0.0;
-        let mut lowest_cost = 1e30;
-        let bounds = self.aabb_from_centroids(first_tri, tri_count);
-        for axis in 0..3  {
-            let min = *bounds.min.index(axis);
-            let max = *bounds.max.index(axis);
-            if min == max { continue }
-            let step_size = (max - min) / STEPS as f32;
-            for i in 1..STEPS {
-                let split_pos = min + i as f32 * step_size;
-                let cost = self.evaluate_split_sah(node_idx, axis, split_pos);
-                if cost < lowest_cost {
-                    best_axis = axis;
-                    best_split_pos = split_pos;
-                    lowest_cost = cost;
-                }
-            }
-        }
-        (best_axis, best_split_pos, lowest_cost)
     }
 
     // third version, uses a binning system to avoid recalculating sah for every split individually
@@ -259,48 +195,6 @@ impl BVHBuilder {
             }
         }
         (best_axis, best_split_pos, lowest_cost)
-    }
-
-    // first version, uses midpoint algorithm to split nodes
-    // construction time: fast O(N)
-    // traverse time: slow
-    #[deprecated]
-    #[allow(dead_code, deprecated)]
-    fn split_leaf_node(&mut self, node_idx: usize) {
-        let node_count = self.nodes.len();
-        let first_triangle = self.fetch_node(node_idx).first_triangle() as usize;
-        let triangle_count = self.fetch_node(node_idx).triangle_count() as usize;
-
-        // if leaf has only one triangle, leave as leaf
-        if triangle_count <= 1 { return }
-
-        // choose axis to split on
-        let bounds = self.fetch_node(node_idx).bounds();
-        let size = bounds.max - bounds.min;
-        let mut axis = 0;
-        if size.y > size.x { axis = 1 }
-        if size.z > *size.index(axis) { axis = 2 }
-        let split_pos = *bounds.min.index(axis) + *size.index(axis) * 0.5;
-
-        // sort triangles along axis
-        let middle = self.split_triangles_along_plane(
-            first_triangle, triangle_count,
-            axis, split_pos,
-        );
-
-        // if one node would contain all or no triangles, don't split
-        let left_count = middle - first_triangle;
-        let right_count = triangle_count - left_count;
-        if left_count == 0 || left_count == triangle_count { return }
-
-        // create and split child nodes
-        self.convert_leaf_to_node(node_idx, node_count, node_count + 1);
-
-        self.create_leaf_node_from_triangles(first_triangle, left_count);
-        self.create_leaf_node_from_triangles(middle, right_count);
-
-        self.split_leaf_node(node_count);
-        self.split_leaf_node(node_count + 1);
     }
 
     // second version, uses surface area heuristics to find best split position

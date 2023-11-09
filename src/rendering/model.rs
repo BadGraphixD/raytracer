@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use cgmath::{Vector2, Vector3};
+use crate::raytracing::bvh::{BVH, BVHBuilder};
 use crate::raytracing::types::{IndexBundle, Triangle};
 
 pub struct Model {
@@ -10,6 +11,8 @@ pub struct Model {
 
     material_libs: Vec<String>,
     materials: Vec<String>,
+
+    bvh: Option<BVH>,
 }
 
 impl Model {
@@ -25,8 +28,12 @@ impl Model {
         self.triangles = triangles;
     }
 
+    pub fn build_bvh(&mut self) { self.bvh = Some(BVHBuilder::new(self).build()) }
+
     pub fn get_material_libs(&self) -> &Vec<String> { &self.material_libs }
     pub fn get_materials(&self) -> &Vec<String> { &self.materials }
+
+    pub fn get_bvh(&self) -> Option<&BVH> { self.bvh.as_ref() }
 
     pub fn print_info(&self) {
         println!("--- Model Info ---");
@@ -123,6 +130,7 @@ impl ModelBuilder {
             normals: if has_normals { Some(new_normals) } else { None },
             material_libs: self.material_libs.into_iter().collect(),
             materials: sorted_materials,
+            bvh: None,
         }
     }
 }

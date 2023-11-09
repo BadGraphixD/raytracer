@@ -1,8 +1,5 @@
-use std::collections::{HashMap, HashSet};
 use cgmath::{Array, Vector3};
-use crate::util::error::{ResourceError, ResourceParseError};
-use crate::util::model_parser::ResourceParser;
-use crate::util::resource::Resource;
+use crate::util::error::ResourceParseError;
 
 #[derive(Debug)]
 pub struct Material {

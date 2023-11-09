@@ -1,7 +1,7 @@
 use std::iter::Filter;
 use std::ops::RangeBounds;
 use std::str::Split;
-use crate::util::error::ResourceParseError;
+use crate::util::error::{ResourceError, ResourceParseError};
 use cgmath::{Vector2, Vector3};
 use crate::raytracing::types::IndexBundle;
 use crate::rendering::material::{Material, MaterialLibBuilder};
@@ -46,7 +46,7 @@ impl ResourceParser {
         Ok(model_builder.build())
     }
 
-    pub fn parse_material_lib(data: String) -> Result<Vec<(String, Material)>, (ResourceParseError, u32)> {
+    pub fn parse_material_lib(data: String, name: &str) -> Result<Vec<(String, Material)>, ResourceError> {
         let mut lib_builder = MaterialLibBuilder::new();
 
         data.split('\n').zip(1..).map(|(str, i)| {
@@ -103,7 +103,7 @@ impl ResourceParser {
                 lib_builder.specular_exp_tex(value).map_err(|e| (e, i))?;
             }
             Ok(())
-        }).collect::<Result<Vec<_>, _>>()?;
+        }).collect::<Result<Vec<_>, _>>().map_err(|(e, i)| ResourceError::parse_err(e, i, name))?;
 
         Ok(lib_builder.build())
     }

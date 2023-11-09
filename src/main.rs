@@ -1,18 +1,12 @@
 use crate::gl_wrapper::buffer::{ShaderStorageBuffer};
 use crate::gl_wrapper::framebuffer::Framebuffer;
 use crate::gl_wrapper::geometry_set::GeometrySetBuilder;
-use crate::gl_wrapper::shader::{Shader, ShaderProgramBuilder};
+use crate::gl_wrapper::shader::ShaderProgramBuilder;
 use crate::gl_wrapper::texture::Texture;
 use crate::gl_wrapper::types::{ShaderType, TextureAttachment, TextureFilter, TextureFormat};
-use crate::raytracing::bvh::BVHBuilder;
 use crate::rendering::camera::Camera;
-use crate::rendering::material::MaterialManager;
-use crate::rendering::texture_manager::TextureManager;
+use crate::resource::resource_manager::ResourceManager;
 use crate::util::camera_controller::CameraController;
-use crate::util::error::ResourceError;
-use crate::util::model_parser::ResourceParser;
-use crate::util::resource::Resource;
-use crate::util::resource_manager::ResourceManager;
 use crate::window::window::Window;
 
 pub mod gl_wrapper;
@@ -20,6 +14,7 @@ pub mod raytracing;
 pub mod rendering;
 pub mod util;
 pub mod window;
+pub mod resource;
 
 fn main() {
     // create window
@@ -33,9 +28,9 @@ fn main() {
 
     // load shaders
     let quad_vert = resource_manager.get_shader("quad.vert", ShaderType::VertexShader).unwrap();
-    let ray_create_frag = Shader::new_fragment(shaders.read_file("ray_create.frag").unwrap()).unwrap();
-    let ray_trace_frag = Shader::new_fragment(shaders.read_file("ray_trace_and_shade.frag").unwrap()).unwrap();
-    let display_frag = Shader::new_fragment(shaders.read_file("display.frag").unwrap()).unwrap();
+    let ray_create_frag = resource_manager.get_shader("ray_trace_and_shade.frag", ShaderType::FragmentShader).unwrap();
+    let ray_trace_frag = resource_manager.get_shader("ray_trace_and_shade.frag", ShaderType::FragmentShader).unwrap();
+    let display_frag = resource_manager.get_shader("display.frag", ShaderType::FragmentShader).unwrap();
 
     let mut ray_create_program = ShaderProgramBuilder::new()
         .add_shader(&quad_vert)
@@ -53,22 +48,11 @@ fn main() {
         .build().unwrap();
 
     // load models
-    let model = ResourceParser::parse_model(models.read_file("f16.obj").unwrap()).unwrap();
-    let (model_nodes, model) = BVHBuilder::new(model).build();
-
-    // load materials
-    let mut mat_manager = MaterialManager::new();
-    mat_manager.load_libs(&models, model.get_material_libs()).expect("Failed to load material libs");
+    let model = resource_manager.get_model_mut("f16.obj").expect("Failed to load model");
+    model.build_bvh();
 
     // load textures
-    let mut texture_manager = TextureManager::new();
-    model.get_materials().iter().map(|name| {
-        let material = mat_manager.get_material(name)
-            .ok_or(ResourceError::MaterialNotLoaded { name: name.to_owned() })?;
-        texture_manager.load_textures(&textures, material)
-    }).collect::<Result<Vec<_>, _>>().expect("Failed to load textures");
-
-    let model_texture = texture_manager.get_texture("F16s.bmp").expect("Texture not present");
+    let model_texture = resource_manager.get_texture("F16s.bmp").expect("Texture not present");
 
     // create frame buffers
     let mut ray_dir_framebuffer = Framebuffer::new();
@@ -99,7 +83,7 @@ fn main() {
     let position_ssbo = ShaderStorageBuffer::new();
     let tex_coord_ssbo = ShaderStorageBuffer::new();
     let normal_ssbo = ShaderStorageBuffer::new();
-    node_ssbo.buffer_data(&model_nodes);
+    node_ssbo.buffer_data(model.get_bvh().unwrap().data());
     triangle_ssbo.buffer_data(model.triangles());
     position_ssbo.buffer_data(model.positions());
     if let Some(model_uvs) = model.tex_coords() { tex_coord_ssbo.buffer_data(model_uvs) }
