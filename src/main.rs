@@ -3,13 +3,16 @@ use crate::gl_wrapper::framebuffer::Framebuffer;
 use crate::gl_wrapper::geometry_set::GeometrySetBuilder;
 use crate::gl_wrapper::shader::{Shader, ShaderProgramBuilder};
 use crate::gl_wrapper::texture::Texture;
-use crate::gl_wrapper::types::{TextureAttachment, TextureFilter, TextureFormat};
+use crate::gl_wrapper::types::{ShaderType, TextureAttachment, TextureFilter, TextureFormat};
 use crate::raytracing::bvh::BVHBuilder;
 use crate::rendering::camera::Camera;
 use crate::rendering::material::MaterialManager;
+use crate::rendering::texture_manager::TextureManager;
 use crate::util::camera_controller::CameraController;
+use crate::util::error::ResourceError;
 use crate::util::model_parser::ResourceParser;
 use crate::util::resource::Resource;
+use crate::util::resource_manager::ResourceManager;
 use crate::window::window::Window;
 
 pub mod gl_wrapper;
@@ -25,12 +28,11 @@ fn main() {
     let camera_controller = CameraController::new(1.0, 8.0);
 
     // load resources
-    let shaders = Resource::new_rel_to_exe("res/shaders").unwrap();
-    let models = Resource::new_rel_to_exe("res/models").unwrap();
-    let textures = Resource::new_rel_to_exe("res/textures").unwrap();
+    let mut resource_manager = ResourceManager::new("res/models", "res/textures", "res/shaders")
+        .expect("Failed to create resource manager");
 
     // load shaders
-    let quad_vert = Shader::new_vertex(shaders.read_file("quad.vert").unwrap()).unwrap();
+    let quad_vert = resource_manager.get_shader("quad.vert", ShaderType::VertexShader).unwrap();
     let ray_create_frag = Shader::new_fragment(shaders.read_file("ray_create.frag").unwrap()).unwrap();
     let ray_trace_frag = Shader::new_fragment(shaders.read_file("ray_trace_and_shade.frag").unwrap()).unwrap();
     let display_frag = Shader::new_fragment(shaders.read_file("display.frag").unwrap()).unwrap();
@@ -58,6 +60,16 @@ fn main() {
     let mut mat_manager = MaterialManager::new();
     mat_manager.load_libs(&models, model.get_material_libs()).expect("Failed to load material libs");
 
+    // load textures
+    let mut texture_manager = TextureManager::new();
+    model.get_materials().iter().map(|name| {
+        let material = mat_manager.get_material(name)
+            .ok_or(ResourceError::MaterialNotLoaded { name: name.to_owned() })?;
+        texture_manager.load_textures(&textures, material)
+    }).collect::<Result<Vec<_>, _>>().expect("Failed to load textures");
+
+    let model_texture = texture_manager.get_texture("F16s.bmp").expect("Texture not present");
+
     // create frame buffers
     let mut ray_dir_framebuffer = Framebuffer::new();
     let mut ray_dir_texture = Texture::new(
@@ -76,10 +88,6 @@ fn main() {
     );
     col_framebuffer.attach_texture(&col_texture, TextureAttachment::Color(0));
     col_framebuffer.bind_draw_buffers();
-
-    // create textures
-    let texture_data = textures.read_image_file("uv_debug.png").expect("Failed to load image data").into_rgb8();
-    let model_texture = Texture::from_data(TextureFormat::RGB8, TextureFilter::Linear, &texture_data);
 
     // create geometry
     let (quad_geometry, _ibo, _vbo) = GeometrySetBuilder::create_square_geometry();

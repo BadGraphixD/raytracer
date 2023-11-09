@@ -203,7 +203,7 @@ void main() {
         float shadow_t = 1000000;
         vec3 shadow_ray_dir = SUN_DIR;
         Ray shadow_ray = Ray(
-            org + dir * t + normal * EPSILON,
+            org + dir * t + normal * 0.0001,
             shadow_ray_dir, 1 / shadow_ray_dir
         );
         traverseBVH(shadow_ray, shadow_t, triangleIdx, uv, intersections);

@@ -8,36 +8,40 @@ pub enum WindowError {
 }
 
 #[derive(Debug)]
-pub enum ResourceError {
+pub enum ResourceLoadError {
     FailedToGetExePath,
-    FileContainsNil(String),
-    ImageError(ImageError),
-    Io(std::io::Error),
-    ResourceParseError(ResourceParseError),
-    ResourceParseErrorLine(ResourceParseError, u32),
+    FileContainsNil,
+    ImageError { e: ImageError },
+    Io { e: std::io::Error },
 }
 
-impl From<std::io::Error> for ResourceError {
-    fn from(value: std::io::Error) -> Self {
-        return ResourceError::Io(value);
+#[derive(Debug)]
+pub enum ResourceParseError {
+    ParseIntError { err: ParseIntError, line: String },
+    InvalidLineArgCount { count: usize, line: String },
+    NoMaterialNamed,
+}
+
+#[derive(Debug)]
+pub enum ResourceError {
+    ResourceLoadError { e: ResourceLoadError, file_name: String },
+    ResourceParseError { e: ResourceParseError, line: u32, file_name: String },
+    ShaderError { e: ShaderError },
+    DuplicateMaterialDefinition { name: String },
+    MaterialNotLoaded { name: String },
+}
+
+impl ResourceError {
+    pub fn load_err(e: ResourceLoadError, file_name: &str) -> Self {
+        Self::ResourceLoadError { e, file_name: file_name.to_owned() }
     }
-}
 
-impl From<ImageError> for ResourceError {
-    fn from(value: ImageError) -> Self {
-        return ResourceError::ImageError(value);
+    pub fn parse_err(e: ResourceParseError, line: u32, file_name: &str) -> Self {
+        Self::ResourceParseError { e, line, file_name: file_name.to_owned() }
     }
-}
 
-impl From<ResourceParseError> for ResourceError {
-    fn from(value: ResourceParseError) -> Self {
-        return ResourceError::ResourceParseError(value);
-    }
-}
-
-impl From<(ResourceParseError, u32)> for ResourceError {
-    fn from(value: (ResourceParseError, u32)) -> Self {
-        return ResourceError::ResourceParseErrorLine(value.0, value.1);
+    pub fn shader_err(e: ShaderError) -> Self {
+        Self::ShaderError { e }
     }
 }
 
@@ -50,14 +54,4 @@ pub enum ShaderError {
 #[derive(Debug)]
 pub enum FramebufferError {
     Error(u32),
-}
-
-#[derive(Debug)]
-pub enum ResourceParseError {
-    ParseIntError(ParseIntError, String),
-    InvalidIndexLineArgCount(usize, String),
-    InvalidStringLineArgCount(usize, String),
-    InvalidLineArgCount(usize, String),
-    NoMaterialNamed,
-    DuplicateMaterialDefinition,
 }

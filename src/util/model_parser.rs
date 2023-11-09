@@ -1,4 +1,6 @@
+use std::iter::Filter;
 use std::ops::RangeBounds;
+use std::str::Split;
 use crate::util::error::ResourceParseError;
 use cgmath::{Vector2, Vector3};
 use crate::raytracing::types::IndexBundle;
@@ -107,28 +109,42 @@ impl ResourceParser {
     }
 
     fn parse_string_line(str: &str) -> Result<String, ResourceParseError> {
-        let values: Vec<&str> = str.split(' ').filter(|s| !s.is_empty()).collect();
+        let values = Self::split_line(str);
         let l = values.len();
-        if l != 2 { Err(ResourceParseError::InvalidStringLineArgCount(l, str.to_owned())) }
+        if l != 2 { Err(ResourceParseError::InvalidLineArgCount { count: l, line: str.to_owned() }) }
         else { Ok(values[1].trim().to_owned()) }
     }
 
     fn parse_line<R: RangeBounds<usize>>(str: &str, len: R) -> Result<Vec<f32>, ResourceParseError> {
-        let values: Vec<&str> = str.split(' ').filter(|s| !s.is_empty()).collect();
+        let values = Self::split_line(str);
         let l = values.len();
-        if !len.contains(&(l - 1)) { Err(ResourceParseError::InvalidLineArgCount(l, str.to_owned())) }
+        if !len.contains(&(l - 1)) { Err(ResourceParseError::InvalidLineArgCount { count: l, line: str.to_owned() }) }
         else { Ok(values.into_iter().skip(1).map(|str| str.trim().parse::<f32>().unwrap()).collect()) }
     }
 
     fn parse_index_line(str: &str) -> Result<Vec<(IndexBundle, IndexBundle, IndexBundle)>, ResourceParseError> {
-        let indices: Vec<Vec<&str>> = str.split(' ').filter(|s| !s.is_empty())
-            .map(|s| s.split(['/', '\\']).collect::<Vec<&str>>()).collect::<Vec<Vec<&str>>>();
-        let len = indices.len();
-        if len < 4 { Err(ResourceParseError::InvalidIndexLineArgCount(len, str.to_owned())) }
+        let indices = Self::split_index_line(str);
+        let l = indices.len();
+        if l < 4 { Err(ResourceParseError::InvalidLineArgCount { count: l, line: str.to_owned() }) }
         else {
             let num_tris = indices.len() - 3;
             let bundles: Vec<IndexBundle> = indices.iter().skip(1).map(IndexBundle::new).collect::<Result<Vec<_>, _>>()?;
             Ok((0..num_tris).into_iter().map(|i| (bundles[0].clone(), bundles[i + 1].clone(), bundles[i + 2].clone())).collect())
         }
+    }
+
+    #[inline]
+    fn split_line_iter(str: &str) -> Filter<Split<char>, fn(&&str) -> bool> {
+        str.split(' ').filter(|s| !s.trim().is_empty())
+    }
+
+    #[inline]
+    fn split_line(str: &str) -> Vec<&str> {
+        Self::split_line_iter(str).collect()
+    }
+
+    #[inline]
+    fn split_index_line(str: &str) -> Vec<Vec<&str>> {
+        Self::split_line_iter(str).map(|s| s.split(['/', '\\']).collect()).collect()
     }
 }

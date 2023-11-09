@@ -41,39 +41,14 @@ impl Material {
             specular_exp_tex: None,
         }
     }
-}
 
-pub struct MaterialManager {
-    loaded_libs: HashSet<String>,
-    materials: HashMap<String, Material>,
-}
-
-impl MaterialManager {
-    pub fn new() -> Self {
-        Self { loaded_libs: HashSet::new(), materials: HashMap::new() }
-    }
-
-    pub fn load_lib(&mut self, res: &Resource, name: &str) -> Result<(), ResourceError> {
-        let data = res.read_file(name)?;
-        self.loaded_libs.insert(name.to_owned());
-        ResourceParser::parse_material_lib(data)?.into_iter().map(|(name, mat)| {
-            if self.materials.contains_key(&name) {
-                Err(ResourceParseError::DuplicateMaterialDefinition)
-            } else {
-                self.materials.insert(name, mat);
-                Ok(())
-            }
-        }).collect::<Result<Vec<_>, _>>()?;
-        Ok(())
-    }
-
-    pub fn load_libs(&mut self, res: &Resource, names: &Vec<String>) -> Result<(), ResourceError> {
-        names.iter().map(|lib| self.load_lib(res, lib)).collect::<Result<Vec<_>, _>>()?;
-        Ok(())
-    }
-
-    pub fn get_material(&self, name: &str) -> Option<&Material> {
-        self.materials.get(name)
+    pub fn get_texture_names(&self) -> Vec<String> {
+        let mut names = vec![];
+        if let Some(t) = &self.ambient_tex { names.push(t.to_owned()) };
+        if let Some(t) = &self.diffuse_tex { names.push(t.to_owned()) };
+        if let Some(t) = &self.specular_tex { names.push(t.to_owned()) };
+        if let Some(t) = &self.specular_exp_tex { names.push(t.to_owned()) };
+        names
     }
 }
 

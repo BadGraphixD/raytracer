@@ -174,7 +174,7 @@ impl IndexBundle {
     }
 
     pub fn parse(str: &str) -> Result<i32, ResourceParseError> {
-        let idx = str.trim().parse::<i32>().map_err(|e| ResourceParseError::ParseIntError(e, str.to_owned()))?;
+        let idx = str.trim().parse::<i32>().map_err(|err| ResourceParseError::ParseIntError { err, line: str.to_owned() })?;
         Ok(if idx > 0 { idx - 1 } else { idx })
     }
 }
