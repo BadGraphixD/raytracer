@@ -1,4 +1,4 @@
-#version 430
+#version 460 core
 
 #define MISS 1e30
 #define EPSILON 0.000001
@@ -7,9 +7,6 @@
 
 in vec2 fragPos;
 out vec4 fragCol;
-
-uniform sampler2D dirTex;
-uniform vec3 org;
 
 struct Ray {
     vec3 org, dir, rDir;
@@ -40,6 +37,9 @@ struct NodeStack {
     uint nodes[NODE_STACK_SIZE];
     uint idx;
 };
+
+layout (binding = 0) uniform sampler2D dir;
+layout (binding = 1) uniform sampler2D org;
 
 layout (std430, binding = 0) buffer nodeBuffer { Node nodes[]; };
 layout (std430, binding = 1) buffer triangleBuffer { Triangle triangles[]; };
@@ -77,8 +77,8 @@ void intersectTriangle(const Ray ray, const uint triangleIdx, inout Intersection
     h = cross(ray.dir, edge2);
     a = dot(edge1, h);
 
-    // ray must hit from the front
-    if (a < EPSILON) return;
+    // ray can hit from front or behind
+    if (abs(a) < EPSILON) return;
 
     f = 1.0 / a;
     s = ray.org - p0;
@@ -129,7 +129,8 @@ void traverseBVH(const Ray ray, inout Intersection i) {
 }
 
 void main() {
-    vec3 dir = texture(dirTex, (fragPos + 1) / 2).xyz;
+    vec3 dir = texture(dir, fragPos).xyz;
+    vec3 org = texture(org, fragPos).xyz;
     Intersection i = Intersection(MAX_T, 0, 0, 0);
     Ray ray = Ray(org, dir, 1 / dir);
     traverseBVH(ray, i);

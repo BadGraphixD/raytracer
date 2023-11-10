@@ -27,9 +27,9 @@ fn main() {
     let model = resource_manager.get_model("f16.obj").expect("Failed to load model resources");
     model.lock().unwrap().build_bvh();
 
-    let ray_create_program = resource_manager.create_shader_program("rayCreate", "quad.vert", "ray_create.frag").expect("Failed to load shader");
-    let ray_trace_program = resource_manager.create_shader_program("rayTrace", "quad.vert", "ray_trace_and_shade.frag").expect("Failed to load shader");
-    let display_program = resource_manager.create_shader_program("display", "quad.vert", "display.frag").expect("Failed to load shader");
+    let ray_create_program = resource_manager.create_shader_program("rayCreate", "quad-11.vert", "ray_create.frag").expect("Failed to load shader");
+    let ray_trace_program = resource_manager.create_shader_program("rayTrace", "quad01.vert", "ray_trace_and_shade.frag").expect("Failed to load shader");
+    let display_program = resource_manager.create_shader_program("display", "quad01.vert", "display.frag").expect("Failed to load shader");
 
     let model_texture1 = resource_manager.get_texture("F16s.bmp").expect("Texture not present");
     let model_texture2 = resource_manager.get_texture("F16t.bmp").expect("Texture not present");

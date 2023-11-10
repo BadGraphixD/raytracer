@@ -1,4 +1,4 @@
-#version 430
+#version 460 core
 
 #extension GL_EXT_nonuniform_qualifier : enable
 
@@ -188,7 +188,7 @@ vec3 skybox(const vec3 dir) {
 }
 
 void main() {
-    vec3 dir = texture(dirTex, (fragPos + 1) / 2).xyz;
+    vec3 dir = texture(dirTex, fragPos).xyz;
 
     float t = 1000000;
     uint intersections = 0;
