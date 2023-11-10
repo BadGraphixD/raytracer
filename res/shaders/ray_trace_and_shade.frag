@@ -8,8 +8,7 @@ in vec2 fragPos;
 out vec4 fragCol;
 
 uniform sampler2D dirTex;
-uniform sampler2D modelAlbedo1;
-uniform sampler2D modelAlbedo2;
+uniform sampler2D modelTextures[2];
 uniform vec3 org;
 uniform bool hasTexCoords;
 uniform bool hasNormals;
@@ -211,7 +210,7 @@ void main() {
         traverseBVH(shadow_ray, shadow_t, shadow_triangleIdx, uv, intersections);
         bool shadow = shadow_t < 1000;
 
-        vec3 albedo = texture(triangles[triangleIdx].matIdx == 0 ? modelAlbedo1 : modelAlbedo2, vec2(texCoord.x, -texCoord.y)).xyz;
+        vec3 albedo = texture(modelTextures[triangles[triangleIdx].matIdx], vec2(texCoord.x, -texCoord.y)).xyz;
         vec3 ambient = albedo * skybox(normal) * AMBIENT;
         vec3 diffuse = albedo * SUN_COL * clamp(dot(normal, SUN_DIR), 0, 1) * DIFFUSE;
         vec3 specular = SUN_COL * clamp(pow(dot(reflected, SUN_DIR), SPEC_POW), 0, 1) * SPECULAR;

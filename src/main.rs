@@ -104,8 +104,7 @@ fn main() {
         // ### if also shade ###
         model_texture1.bind_to_slot(1);
         model_texture2.bind_to_slot(2);
-        ray_trace_program.lock().unwrap().set_uniform_texture("modelAlbedo1", 1);
-        ray_trace_program.lock().unwrap().set_uniform_texture("modelAlbedo2", 2);
+        ray_trace_program.lock().unwrap().set_uniform_texture_array("modelTextures", vec![1, 2]);
         ray_trace_program.lock().unwrap().set_uniform_1b("hasTexCoords", model.lock().unwrap().has_tex_coords());
         ray_trace_program.lock().unwrap().set_uniform_1b("hasNormals", model.lock().unwrap().has_normals());
         if model.lock().unwrap().has_tex_coords() { tex_coord_ssbo.bind_to_slot(3) }

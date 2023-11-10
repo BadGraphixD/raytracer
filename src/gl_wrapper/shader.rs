@@ -136,6 +136,10 @@ impl ShaderProgram {
         unsafe { gl::Uniform1i(self.uniform_location(name), texture) }
     }
 
+    pub fn set_uniform_texture_array(&mut self, name: &str, v: Vec<i32>) {
+        unsafe { gl::Uniform1iv(self.uniform_location(name), v.len() as i32, v.as_ptr()) }
+    }
+
     pub fn set_uniform_3f(&mut self, name: &str, v: Vector3<f32>) {
         unsafe { gl::Uniform3f(self.uniform_location(name), v[0], v[1], v[2]) }
     }
