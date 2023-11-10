@@ -1,5 +1,7 @@
 #version 430
 
+#extension GL_EXT_nonuniform_qualifier : enable
+
 #define MISS 1e30
 #define EPSILON 0.000001
 #define NODE_STACK_SIZE 100
@@ -210,7 +212,7 @@ void main() {
         traverseBVH(shadow_ray, shadow_t, shadow_triangleIdx, uv, intersections);
         bool shadow = shadow_t < 1000;
 
-        vec3 albedo = texture(modelTextures[triangles[triangleIdx].matIdx], vec2(texCoord.x, -texCoord.y)).xyz;
+        vec3 albedo = texture(modelTextures[nonuniformEXT(triangles[triangleIdx].matIdx)], vec2(texCoord.x, -texCoord.y)).xyz;
         vec3 ambient = albedo * skybox(normal) * AMBIENT;
         vec3 diffuse = albedo * SUN_COL * clamp(dot(normal, SUN_DIR), 0, 1) * DIFFUSE;
         vec3 specular = SUN_COL * clamp(pow(dot(reflected, SUN_DIR), SPEC_POW), 0, 1) * SPECULAR;
