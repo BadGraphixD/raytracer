@@ -85,11 +85,12 @@ impl Texture {
         unsafe { gl::BindTexture(gl::TEXTURE_2D, 0) }
     }
 
-    pub fn bind_to_slot(&self, slot: u32) {
+    pub fn bind_to_slot(&self, slot: u32) -> u32 {
         unsafe {
             gl::ActiveTexture(gl::TEXTURE0 + slot);
         }
         self.bind();
+        slot
     }
 
     pub fn reformat(&mut self, width: u32, height: u32, format: TextureFormat) {

@@ -132,24 +132,25 @@ impl ShaderProgram {
         unsafe { gl::UseProgram(0) }
     }
 
-    pub fn set_uniform_texture(&mut self, name: &str, texture: i32) {
-        unsafe { gl::Uniform1i(self.uniform_location(name), texture) }
+    pub fn set_uniform_texture(&mut self, loc: i32, texture: u32) {
+        unsafe { gl::Uniform1i(loc, texture as i32) }
     }
 
-    pub fn set_uniform_texture_array(&mut self, name: &str, v: Vec<i32>) {
-        unsafe { gl::Uniform1iv(self.uniform_location(name), v.len() as i32, v.as_ptr()) }
+    pub fn set_uniform_texture_array(&mut self, loc: i32, v: Vec<u32>) {
+        let v = v.into_iter().map(|i| i as i32).collect::<Vec<i32>>();
+        unsafe { gl::Uniform1iv(loc, v.len() as i32, v.as_ptr()) }
     }
 
-    pub fn set_uniform_3f(&mut self, name: &str, v: Vector3<f32>) {
-        unsafe { gl::Uniform3f(self.uniform_location(name), v[0], v[1], v[2]) }
+    pub fn set_uniform_3f(&mut self, loc: i32, v: Vector3<f32>) {
+        unsafe { gl::Uniform3f(loc, v[0], v[1], v[2]) }
     }
 
-    pub fn set_uniform_1i(&mut self, name: &str, i: i32) {
-        unsafe { gl::Uniform1i(self.uniform_location(name), i) }
+    pub fn set_uniform_1i(&mut self, loc: i32, i: i32) {
+        unsafe { gl::Uniform1i(loc, i) }
     }
 
-    pub fn set_uniform_1b(&mut self, name: &str, b: bool) {
-        unsafe { gl::Uniform1i(self.uniform_location(name), b as i32) }
+    pub fn set_uniform_1b(&mut self, loc: i32, b: bool) {
+        unsafe { gl::Uniform1i(loc, b as i32) }
     }
 
     pub fn uniform_location(&mut self, name: &str) -> i32 {

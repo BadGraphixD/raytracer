@@ -35,14 +35,20 @@ fn main() {
     let model_texture2 = resource_manager.get_texture("F16t.bmp").expect("Texture not present");
 
     // create frame buffers
-    let mut ray_dir_framebuffer = Framebuffer::new();
+    let mut ray_framebuffer = Framebuffer::new();
     let mut ray_dir_texture = Texture::new(
         window.width(), window.height(),
         TextureFormat::RGB32F,
         TextureFilter::Nearest,
     );
-    ray_dir_framebuffer.attach_texture(&ray_dir_texture, TextureAttachment::Color(0));
-    ray_dir_framebuffer.bind_draw_buffers();
+    let mut ray_org_texture = Texture::new(
+        window.width(), window.height(),
+        TextureFormat::RGB32F,
+        TextureFilter::Nearest,
+    );
+    ray_framebuffer.attach_texture(&ray_dir_texture, TextureAttachment::Color(0));
+    ray_framebuffer.attach_texture(&ray_org_texture, TextureAttachment::Color(1));
+    ray_framebuffer.bind_draw_buffers();
 
     let mut col_framebuffer = Framebuffer::new();
     let mut col_texture = Texture::new(
@@ -81,32 +87,34 @@ fn main() {
         if window.resized() {
             unsafe { gl::Viewport(0, 0, window.width() as i32, window.height() as i32) }
             ray_dir_texture.resize(window.width(), window.height());
+            ray_org_texture.resize(window.width(), window.height());
             col_texture.resize(window.width(), window.height());
         }
 
         let cvv = camera.generate_view_vectors(&window);
 
         // create rays
-        ray_dir_framebuffer.bind();
+        ray_framebuffer.bind();
         ray_create_program.lock().unwrap().bind();
-        ray_create_program.lock().unwrap().set_uniform_3f("right", cvv.right);
-        ray_create_program.lock().unwrap().set_uniform_3f("up", cvv.up);
-        ray_create_program.lock().unwrap().set_uniform_3f("front", cvv.front);
+        ray_create_program.lock().unwrap().set_uniform_3f(0, cvv.right);
+        ray_create_program.lock().unwrap().set_uniform_3f(1, cvv.up);
+        ray_create_program.lock().unwrap().set_uniform_3f(2, cvv.front);
+        ray_create_program.lock().unwrap().set_uniform_3f(3, cvv.pos);
         quad_geometry.draw();
 
         // ray trace
         col_framebuffer.bind();
         ray_trace_program.lock().unwrap().bind();
-        ray_dir_texture.bind_to_slot(0);
-        ray_trace_program.lock().unwrap().set_uniform_texture("dirTex", 0);
-        ray_trace_program.lock().unwrap().set_uniform_3f("org", cvv.pos);
+        ray_trace_program.lock().unwrap().set_uniform_texture(1, ray_dir_texture.bind_to_slot(0));
+        ray_trace_program.lock().unwrap().set_uniform_texture(1, ray_org_texture.bind_to_slot(1));
 
         // ### if also shade ###
-        model_texture1.bind_to_slot(1);
-        model_texture2.bind_to_slot(2);
-        ray_trace_program.lock().unwrap().set_uniform_texture_array("modelTextures", vec![1, 2]);
-        ray_trace_program.lock().unwrap().set_uniform_1b("hasTexCoords", model.lock().unwrap().has_tex_coords());
-        ray_trace_program.lock().unwrap().set_uniform_1b("hasNormals", model.lock().unwrap().has_normals());
+        ray_trace_program.lock().unwrap().set_uniform_1b(2, model.lock().unwrap().has_tex_coords());
+        ray_trace_program.lock().unwrap().set_uniform_1b(3, model.lock().unwrap().has_normals());
+        ray_trace_program.lock().unwrap().set_uniform_texture_array(4, vec![
+            model_texture1.bind_to_slot(2),
+            model_texture2.bind_to_slot(3),
+        ]);
         if model.lock().unwrap().has_tex_coords() { tex_coord_ssbo.bind_to_slot(3) }
         if model.lock().unwrap().has_normals() { normal_ssbo.bind_to_slot(4) }
         // ###
@@ -120,7 +128,7 @@ fn main() {
         col_framebuffer.unbind();
         display_program.lock().unwrap().bind();
         col_texture.bind_to_slot(0);
-        display_program.lock().unwrap().set_uniform_texture("display", 0);
+        display_program.lock().unwrap().set_uniform_texture(0, 0);
         quad_geometry.draw();
 
         window.update();

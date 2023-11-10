@@ -38,8 +38,8 @@ struct NodeStack {
     uint idx;
 };
 
-layout (binding = 0) uniform sampler2D dir;
-layout (binding = 1) uniform sampler2D org;
+layout (location = 0) uniform sampler2D dir;
+layout (location = 1) uniform sampler2D org;
 
 layout (std430, binding = 0) buffer nodeBuffer { Node nodes[]; };
 layout (std430, binding = 1) buffer triangleBuffer { Triangle triangles[]; };

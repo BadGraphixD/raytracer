@@ -1,6 +1,11 @@
 #version 460 core
 
 #extension GL_EXT_nonuniform_qualifier : enable
+#ifdef GL_EXT_nonuniform_qualifier
+    #define NON_UNIFORM nonuniformEXT
+#else
+    #define NON_UNIFORM
+#endif
 
 #define MISS 1e30
 #define EPSILON 0.000001
@@ -9,11 +14,11 @@
 in vec2 fragPos;
 out vec4 fragCol;
 
-uniform sampler2D dirTex;
-uniform sampler2D modelTextures[2];
-uniform vec3 org;
-uniform bool hasTexCoords;
-uniform bool hasNormals;
+layout (location = 0) uniform sampler2D dir;
+layout (location = 1) uniform sampler2D org;
+layout (location = 2) uniform bool hasTexCoords;
+layout (location = 3) uniform bool hasNormals;
+layout (location = 4) uniform sampler2D modelTextures[2];
 
 struct Ray {
     vec3 org, dir, rDir;
@@ -188,7 +193,8 @@ vec3 skybox(const vec3 dir) {
 }
 
 void main() {
-    vec3 dir = texture(dirTex, fragPos).xyz;
+    vec3 dir = texture(dir, fragPos).xyz;
+    vec3 org = texture(org, fragPos).xyz;
 
     float t = 1000000;
     uint intersections = 0;
@@ -212,7 +218,7 @@ void main() {
         traverseBVH(shadow_ray, shadow_t, shadow_triangleIdx, uv, intersections);
         bool shadow = shadow_t < 1000;
 
-        vec3 albedo = texture(modelTextures[nonuniformEXT(triangles[triangleIdx].matIdx)], vec2(texCoord.x, -texCoord.y)).xyz;
+        vec3 albedo = texture(modelTextures[NON_UNIFORM(triangles[triangleIdx].matIdx)], vec2(texCoord.x, -texCoord.y)).xyz;
         vec3 ambient = albedo * skybox(normal) * AMBIENT;
         vec3 diffuse = albedo * SUN_COL * clamp(dot(normal, SUN_DIR), 0, 1) * DIFFUSE;
         vec3 specular = SUN_COL * clamp(pow(dot(reflected, SUN_DIR), SPEC_POW), 0, 1) * SPECULAR;

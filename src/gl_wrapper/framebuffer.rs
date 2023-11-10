@@ -52,15 +52,9 @@ impl Framebuffer {
                 .iter()
                 .map(|i| gl::COLOR_ATTACHMENT0 + i)
                 .collect();
-            if self.depth_texture {
-                buffers.push(gl::DEPTH_ATTACHMENT)
-            }
-            if self.stencil_texture {
-                buffers.push(gl::STENCIL_ATTACHMENT)
-            }
-            if self.depth_stencil_texture {
-                buffers.push(gl::DEPTH_STENCIL_ATTACHMENT)
-            }
+            if self.depth_texture { buffers.push(gl::DEPTH_ATTACHMENT) }
+            if self.stencil_texture { buffers.push(gl::STENCIL_ATTACHMENT) }
+            if self.depth_stencil_texture { buffers.push(gl::DEPTH_STENCIL_ATTACHMENT) }
             gl::DrawBuffers(buffers.len() as i32, buffers.as_ptr());
         }
     }
