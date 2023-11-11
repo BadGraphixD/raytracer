@@ -6,7 +6,7 @@
 #define NODE_STACK_SIZE 100
 
 in vec2 fragPos;
-out vec4 fragCol;
+layout (location = 0) out vec4 fragCol;
 
 struct Ray {
     vec3 org, dir, rDir;
