@@ -1,3 +1,4 @@
+use std::sync::{Arc, Mutex};
 use crate::gl_wrapper::buffer::{IndexBuffer, VertexBuffer};
 use crate::gl_wrapper::types::{AttributeType, Primitive};
 use crate::rendering::model::Model;
@@ -90,8 +91,8 @@ impl<'a> GeometrySetBuilder<'a> {
     }
 
     pub fn build(self, indices: &IndexBuffer, primitives: Primitive) -> GeometrySet {
-        let mesh = GeometrySet::new(indices.size(), primitives.to_gl_internal());
-        mesh.bind();
+        let gs = GeometrySet::new(indices.size(), primitives.to_gl_internal());
+        gs.bind();
         indices.bind();
 
         let mut idx = 0;
@@ -121,8 +122,8 @@ impl<'a> GeometrySetBuilder<'a> {
                 });
             }
         });
-
-        mesh
+        gs.unbind(); // fuck this line too
+        gs
     }
 
     pub fn create_square_geometry() -> (GeometrySet, IndexBuffer, VertexBuffer) {
@@ -142,29 +143,33 @@ impl<'a> GeometrySetBuilder<'a> {
         (gs, ibo, vbo)
     }
 
-    pub fn from_model(model: &Model) -> (GeometrySet, IndexBuffer, Vec<VertexBuffer>) {
+    pub fn from_model(model: Arc<Mutex<Model>>) -> (GeometrySet, IndexBuffer, Vec<VertexBuffer>) {
         let mut ibo = IndexBuffer::new();
         let mut pos_vbo = VertexBuffer::new();
         let mut tex_vbo = None;
         let mut nor_vbo = None;
 
-        ibo.buffer_data(model.triangles());
-        pos_vbo.buffer_data(model.positions());
+        let model_guard = model.lock().unwrap();
+
+        ibo.buffer_data(model_guard.triangles());
+        pos_vbo.buffer_data(model_guard.positions());
 
         let mut gsb = GeometrySetBuilder::new()
             .add_buffer(&pos_vbo)
             .add_attribute(3, AttributeType::Float);
 
-        if let Some(tex_coords) = model.tex_coords() {
+        if let Some(tex_coords) = model_guard.tex_coords() {
             tex_vbo = Some(VertexBuffer::new());
             tex_vbo.as_mut().unwrap().buffer_data(tex_coords);
             gsb = gsb.add_buffer(tex_vbo.as_ref().unwrap()).add_attribute(2, AttributeType::Float);
         }
-        if let Some(normals) = model.normals() {
+        if let Some(normals) = model_guard.normals() {
             nor_vbo = Some(VertexBuffer::new());
             nor_vbo.as_mut().unwrap().buffer_data(normals);
             gsb = gsb.add_buffer(nor_vbo.as_ref().unwrap()).add_attribute(3, AttributeType::Float);
         }
+
+        drop(model_guard);
 
         let gs = gsb.build(&ibo, Primitive::Triangles);
         let mut vbos = vec![pos_vbo];

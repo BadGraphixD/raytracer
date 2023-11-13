@@ -37,6 +37,6 @@ void main() {
 
         shadowDir = normalize(lightPos - org);
         reflectDir = material.reflect ? reflect(position - cameraPos, normal) : NO_RAY;
-        ambientDir = normal + random;
+        ambientDir = normal + random * 2 - 1;
     }
 }

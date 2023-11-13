@@ -27,6 +27,18 @@ fn main() {
     let model = resource_manager.get_model("f16.obj").expect("Failed to load model resources");
     model.lock().unwrap().build_bvh();
 
+    let g_buffer_program = resource_manager.create_shader_program(
+        "gBuffer", "rasterize/default.vert", "rasterize/default.frag"
+    ).expect("Failed to load shader");
+
+    let ray_dispatch_program = resource_manager.create_shader_program(
+        "rayDispatch", "util/quad01.vert", "ray_dispatcher.frag"
+    ).expect("Failed to load shader");
+
+    let ray_trace_program = resource_manager.create_shader_program(
+        "rayTrace", "util/quad01.vert", "ray_trace.frag"
+    ).expect("Failed to load shader");
+
     let ray_create_program = resource_manager.create_shader_program("rayCreate", "quad-11.vert", "ray_create.frag").expect("Failed to load shader");
     let ray_trace_program = resource_manager.create_shader_program("rayTrace", "quad01.vert", "ray_trace_and_shade.frag").expect("Failed to load shader");
     let display_program = resource_manager.create_shader_program("display", "quad01.vert", "display.frag").expect("Failed to load shader");
@@ -61,7 +73,7 @@ fn main() {
 
     // create geometry
     let (quad_geometry, _ibo, _vbo) = GeometrySetBuilder::create_square_geometry();
-    //let (model_geometry, _m_ibo, _m_vbo) = GeometrySetBuilder::from_model(&model); // todo: things stop working when this line is second ???
+    let (model_geometry, _m_ibo, _m_vbo) = GeometrySetBuilder::from_model(model.clone());
 
     // create buffer with mesh
     let node_ssbo = ShaderStorageBuffer::new();
@@ -81,8 +93,6 @@ fn main() {
         camera_controller.control(&mut camera, &window, window.dt());
         println!("FPS: {}", (1.0 / window.dt()) as i32);
 
-        // todo: move everything opengl-related from here to render thread
-
         // update buffers
         if window.resized() {
             unsafe { gl::Viewport(0, 0, window.width() as i32, window.height() as i32) }
@@ -92,6 +102,10 @@ fn main() {
         }
 
         let cvv = camera.generate_view_vectors(&window);
+        let vp_mat = camera.view_proj_matrices(&window);
+
+        // render objects to g-buffers
+
 
         // create rays
         ray_framebuffer.bind();

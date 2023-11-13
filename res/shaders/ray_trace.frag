@@ -2,11 +2,10 @@
 
 #define MISS 1e30
 #define EPSILON 0.000001
-#define MAX_T 1000000
 #define NODE_STACK_SIZE 100
 
 in vec2 fragPos;
-layout (location = 0) out vec4 fragCol;
+layout (location = 0) out vec4 intersection;
 
 struct Ray {
     vec3 org, dir, rDir;
@@ -131,10 +130,10 @@ void traverseBVH(const Ray ray, inout Intersection i) {
 void main() {
     vec3 dir = texture(dir, fragPos).xyz;
     vec3 org = texture(org, fragPos).xyz;
-    Intersection i = Intersection(MAX_T, 0, 0, 0);
+    Intersection i = Intersection(MISS, 0, 0, 0);
     Ray ray = Ray(org, dir, 1 / dir);
     traverseBVH(ray, i);
-    fragCol = vec4(
+    intersection = vec4(
         i.t, i.u, i.v,
         uintBitsToFloat(i.tringleIdx)
     );
