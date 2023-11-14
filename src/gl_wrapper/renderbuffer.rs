@@ -1,4 +1,4 @@
-use crate::gl_wrapper::types::{TextureAttachment, TextureFilter, TextureFormat};
+use crate::gl_wrapper::types::{TextureAttachment, TextureFormat};
 
 fn gen_renderbuffer() -> u32 {
     let mut id: u32 = 0;

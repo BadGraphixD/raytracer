@@ -5,7 +5,7 @@ use std::sync::mpsc::Receiver;
 
 pub struct Window {
     glfw: Glfw,
-    window_handle: glfw::Window,
+    window_handle: Option<glfw::Window>,
     events: Receiver<(f64, WindowEvent)>,
     input: Input,
     width: u32,
@@ -46,7 +46,7 @@ impl Window {
         glfw.set_swap_interval(glfw::SwapInterval::None);
 
         Ok(Window {
-            window_handle: window,
+            window_handle: Some(window),
             events,
             input: Input::new(),
             width,
@@ -59,11 +59,11 @@ impl Window {
     }
 
     pub fn should_close(&self) -> bool {
-        self.window_handle.should_close()
+        self.window_handle.as_ref().unwrap().should_close()
     }
 
-    pub fn close(self) {
-        self.window_handle.close()
+    pub fn close(&mut self) {
+        self.window_handle.take().unwrap().close()
     }
 
     pub fn handle_events(&mut self) {
@@ -96,7 +96,7 @@ impl Window {
     }
 
     pub fn update(&mut self) {
-        self.window_handle.swap_buffers();
+        self.window_handle.as_mut().unwrap().swap_buffers();
     }
 
     pub fn input(&self) -> &Input {

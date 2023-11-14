@@ -1,13 +1,14 @@
-use cgmath::{Matrix4, SquareMatrix};
+use std::sync::{Arc, Mutex};
+use cgmath::{Vector2, Vector3, Vector4};
+use rand::random;
 use crate::gl_wrapper::buffer::{ShaderStorageBuffer};
 use crate::gl_wrapper::framebuffer::Framebuffer;
 use crate::gl_wrapper::geometry_set::GeometrySetBuilder;
-use crate::gl_wrapper::texture::Texture;
-use crate::gl_wrapper::types::{TextureAttachment, TextureFilter, TextureFormat};
+use crate::gl_wrapper::types::{TextureAttachment, TextureFormat};
 use crate::rendering::camera::Camera;
 use crate::resource::resource_manager::ResourceManager;
 use rendering::camera_controller::CameraController;
-use crate::gl_wrapper::renderbuffer::Renderbuffer;
+use crate::rendering::framebuffer_manager::FramebufferManager;
 use crate::window::window::Window;
 
 pub mod gl_wrapper;
@@ -19,9 +20,9 @@ pub mod resource;
 
 fn main() {
     // create window
-    let mut window = Window::new(1000, 800, "Raytracing :)").expect("Failed to create window!");
-    let mut camera = Camera::new_default();
-    let camera_controller = CameraController::new(1.0, 8.0);
+    let window = Arc::new(Mutex::new(Window::new(1000, 800, "Raytracing :)").expect("Failed to create window!")));
+    let mut camera = Camera::new_default(window.clone());
+    let camera_controller = CameraController::new(window.clone(), 1.0, 8.0);
 
     // load resources
     let mut resource_manager = ResourceManager::new("res/models", "res/textures", "res/shaders").expect("Failed to create resource manager");
@@ -42,32 +43,24 @@ fn main() {
         "display", "util/quad01.vert", "util/display.frag"
     ).expect("Failed to load shader");
 
+    // load blue noise texture
+    let blue_noise_tex = resource_manager.get_texture("blue_noise.png").expect("Failed to load blue noise texture");
+
     // create frame buffers
-    let mut g_buffer = Framebuffer::new();
-    let mut position_tex = Texture::new(
-        window.width(), window.height(),
-        TextureFormat::RGB32F,
-        TextureFilter::Nearest,
-    );
-    let mut normal_mat_tex = Texture::new(
-        window.width(), window.height(),
-        TextureFormat::RGBA32F,
-        TextureFilter::Nearest,
-    );
-    let mut tex_coord_tex = Texture::new(
-        window.width(), window.height(),
-        TextureFormat::RG32F,
-        TextureFilter::Nearest,
-    );
-    let mut depth_tex = Renderbuffer::new(
-        window.width(), window.height(),
-        TextureFormat::Depth,
-    );
-    g_buffer.attach_renderbuffer(&depth_tex, TextureAttachment::Depth);
-    g_buffer.attach_texture(&position_tex, TextureAttachment::Color(0));
-    g_buffer.attach_texture(&normal_mat_tex, TextureAttachment::Color(1));
-    g_buffer.attach_texture(&tex_coord_tex, TextureAttachment::Color(2));
-    g_buffer.bind_draw_buffers();
+    let mut fbo_manager = FramebufferManager::new(window.clone());
+
+    let g_buffer = fbo_manager.new_framebuffer();
+    let position_tex = fbo_manager.attach_texture(TextureFormat::RGB32F, TextureAttachment::Color(0));
+    let normal_mat_tex = fbo_manager.attach_texture(TextureFormat::RGBA32F, TextureAttachment::Color(1));
+    let tex_coord_tex = fbo_manager.attach_texture(TextureFormat::RG32F, TextureAttachment::Color(2));
+    let depth_rbo = fbo_manager.attach_renderbuffer(TextureFormat::Depth, TextureAttachment::Depth);
+
+    let ray_buffer = fbo_manager.new_framebuffer();
+    let shadow_ray_dir_tex = fbo_manager.attach_texture(TextureFormat::RGB32F, TextureAttachment::Color(0));
+    let reflect_ray_dir_tex = fbo_manager.attach_texture(TextureFormat::RGB32F, TextureAttachment::Color(1));
+    let ambient_ray_dir_tex = fbo_manager.attach_texture(TextureFormat::RGB32F, TextureAttachment::Color(2));
+
+    fbo_manager.build_framebuffers();
 
     // create geometry
     let (quad_geometry, _ibo, _vbo) = GeometrySetBuilder::create_square_geometry();
@@ -87,26 +80,23 @@ fn main() {
 
     Framebuffer::set_clear_color(0.0, 0.0, 0.0, 0.0);
 
-    while !window.should_close() {
+    while !window.lock().unwrap().should_close() {
         // handle events
-        window.handle_events();
-        camera_controller.control(&mut camera, &window, window.dt());
-        println!("FPS: {}", (1.0 / window.dt()) as i32);
+        window.lock().unwrap().handle_events();
+        camera_controller.control(&mut camera);
 
         // update buffers
-        if window.resized() {
+        if window.lock().unwrap().resized() {
+            let window = window.lock().unwrap();
             unsafe { gl::Viewport(0, 0, window.width() as i32, window.height() as i32) }
-            position_tex.resize(window.width(), window.height());
-            normal_mat_tex.resize(window.width(), window.height());
-            tex_coord_tex.resize(window.width(), window.height());
-            depth_tex.resize(window.width(), window.height());
+            fbo_manager.update_buffers();
         }
 
-        let cvv = camera.generate_view_vectors(&window);
-        let vp_mat = camera.view_proj_matrices(&window);
+        let cvv = camera.generate_view_vectors();
+        let vp_mat = camera.view_proj_matrices();
 
         // clear g-buffer and render
-        g_buffer.bind();
+        fbo_manager.bind_fbo(g_buffer);
         Framebuffer::clear_color_depth();
         Framebuffer::enable_depth_test();
         {
@@ -117,19 +107,38 @@ fn main() {
         }
         model_geometry.draw();
 
-        // temp: draw g-buffer pos to screen
-        Framebuffer::bind_default();
+        // create rays
+        fbo_manager.bind_fbo(ray_buffer);
+        Framebuffer::clear_color();
         Framebuffer::disable_depth_test();
         {
-            let mut program = display_program.lock().unwrap();
+            let noise_settings = Vector4::new(
+                random::<f32>(), random::<f32>(),
+                window.lock().unwrap().width() as f32 / blue_noise_tex.width() as f32,
+                window.lock().unwrap().height() as f32 / blue_noise_tex.height() as f32,
+            );
+            let mut program = ray_dispatch_program.lock().unwrap();
             program.bind();
-            position_tex.bind_to_slot(0);
-            program.set_uniform_texture(0, 0);
+            program.set_uniform_texture(0, fbo_manager.bind_tex_to_slot(position_tex, 0));
+            program.set_uniform_texture(1, fbo_manager.bind_tex_to_slot(normal_mat_tex, 1));
+            program.set_uniform_texture(2, blue_noise_tex.bind_to_slot(2));
+            program.set_uniform_3f(3, Vector3::new(5.0, 10.0, 5.0));
+            program.set_uniform_3f(4, cvv.pos);
+            program.set_uniform_4f(5, noise_settings);
         }
         quad_geometry.draw();
 
-        window.update();
+        // temp: draw g-buffer pos to screen
+        Framebuffer::bind_default();
+        {
+            let mut program = display_program.lock().unwrap();
+            program.bind();
+            program.set_uniform_texture(0, fbo_manager.bind_tex_to_slot(position_tex, 0));
+        }
+        quad_geometry.draw();
+
+        window.lock().unwrap().update();
     }
 
-    window.close();
+    window.lock().unwrap().close();
 }

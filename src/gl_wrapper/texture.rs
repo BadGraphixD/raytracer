@@ -125,6 +125,9 @@ impl Texture {
             );
         }
     }
+
+    pub fn width(&self) -> u32 { self.width }
+    pub fn height(&self) -> u32 { self.height }
 }
 
 impl Drop for Texture {
