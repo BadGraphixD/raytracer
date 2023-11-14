@@ -120,7 +120,7 @@ impl TextureFilter {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 pub enum TextureFormat {
     Depth,
     DepthStencil,

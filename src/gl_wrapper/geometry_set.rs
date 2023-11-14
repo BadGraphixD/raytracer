@@ -151,7 +151,7 @@ impl<'a> GeometrySetBuilder<'a> {
 
         let model_guard = model.lock().unwrap();
 
-        ibo.buffer_data(model_guard.triangles());
+        ibo.buffer_data(model_guard.indices());
         pos_vbo.buffer_data(model_guard.positions());
 
         let mut gsb = GeometrySetBuilder::new()

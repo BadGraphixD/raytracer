@@ -67,8 +67,8 @@ impl Camera {
 
     pub fn view_proj_matrices(&self, window: &Window) -> CameraViewProjMatrices {
         CameraViewProjMatrices {
-            view: Matrix4::look_at_lh(self.position, self.position.add(self.direction), self.up),
-            proj: perspective(self.fov, window.aspect(), 0.1, 10000.0),
+            view: Matrix4::look_at_rh(self.position, self.position.add(self.direction), self.up),
+            proj: perspective(self.fov, window.aspect(), 0.01, 1000.0),
         }
     }
 }

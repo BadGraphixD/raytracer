@@ -1,3 +1,4 @@
+use std::iter::once;
 use std::ops::Index;
 use crate::raytracing::types::{BVHNode, Triangle, AABB, AABBBuilder, Bin};
 use cgmath::Vector3;
@@ -72,6 +73,9 @@ impl<'a> BVHBuilder<'a> {
         self.nodes.push(BVHNode::new_dummy());
         self.split_leaf_node_sah(0);
         self.model.set_triangles(self.triangles.iter().map(BVHTriangle::to_tri).collect());
+        self.model.set_indices(self.triangles.iter().flat_map(|tri| {
+            [tri.p0 as u32, tri.p1 as u32, tri.p2 as u32].into_iter()
+        }).collect());
         BVH::new(self.nodes)
     }
 

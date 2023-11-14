@@ -1,3 +1,4 @@
+use crate::gl_wrapper::renderbuffer::Renderbuffer;
 use crate::gl_wrapper::texture::Texture;
 use crate::gl_wrapper::types::TextureAttachment;
 use crate::util::error::FramebufferError;
@@ -30,19 +31,38 @@ impl Framebuffer {
     pub fn bind(&self) {
         unsafe { gl::BindFramebuffer(gl::FRAMEBUFFER, self.fbo) }
     }
-    pub fn unbind(&self) {
-        unsafe { gl::BindFramebuffer(gl::FRAMEBUFFER, 0) }
+    pub fn unbind(&self) { Self::bind_default() }
+    pub fn bind_default() { unsafe { gl::BindFramebuffer(gl::FRAMEBUFFER, 0) } }
+
+    pub fn set_clear_color(r: f32, g: f32, b: f32, a: f32) {
+        unsafe { gl::ClearColor(r, g, b, a) }
     }
+    pub fn clear_color() {
+        unsafe { gl::Clear(gl::COLOR_BUFFER_BIT) }
+    }
+    pub fn clear_color_depth() {
+        unsafe { gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT) }
+    }
+    pub fn enable_depth_test() { unsafe { gl::Enable(gl::DEPTH_TEST) } }
+    pub fn disable_depth_test() { unsafe { gl::Disable(gl::DEPTH_TEST) } }
 
     pub fn attach_texture(&mut self, texture: &Texture, attachment: TextureAttachment) {
         self.bind();
+        self.attach(&attachment);
+        texture.attach_to_framebuffer(attachment);
+    }
+    pub fn attach_renderbuffer(&mut self, rbo: &Renderbuffer, attachment: TextureAttachment) {
+        self.bind();
+        self.attach(&attachment);
+        rbo.attach_to_framebuffer(attachment);
+    }
+    fn attach(&mut self, attachment: &TextureAttachment) {
         match attachment {
-            TextureAttachment::Color(idx) => self.color_textures.push(idx),
+            TextureAttachment::Color(idx) => self.color_textures.push(*idx),
             TextureAttachment::Depth => self.depth_texture = true,
             TextureAttachment::Stencil => self.stencil_texture = true,
             TextureAttachment::DepthStencil => self.depth_stencil_texture = true,
         }
-        texture.attach_to_framebuffer(attachment);
     }
 
     pub fn bind_draw_buffers(&self) {

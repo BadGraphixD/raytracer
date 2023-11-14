@@ -8,7 +8,7 @@ layout (location = 0) out vec3 position;
 layout (location = 1) out vec4 normalMat;
 layout (location = 2) out vec2 texCoords;
 
-layout (location = 0) uniform int materialIdx;
+layout (location = 1) uniform int materialIdx;
 
 void main() {
     position = vertPosition;

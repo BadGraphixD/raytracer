@@ -35,7 +35,7 @@ void main() {
         vec3 random = texture(blueNoise, fragPos * noiseOffsetScale.zw + noiseOffsetScale.xy).xyz;
         Material material = materials[materialIdx];
 
-        shadowDir = normalize(lightPos - org);
+        shadowDir = normalize(lightPos - position);
         reflectDir = material.reflect ? reflect(position - cameraPos, normal) : NO_RAY;
         ambientDir = normal + random * 2 - 1;
     }

@@ -5,6 +5,7 @@ use crate::raytracing::types::{IndexBundle, Triangle};
 
 pub struct Model {
     triangles: Vec<Triangle>,
+    indices: Vec<u32>,
     positions: Vec<Vector3<f32>>,
     tex_coords: Option<Vec<Vector2<f32>>>,
     normals: Option<Vec<Vector3<f32>>>,
@@ -17,6 +18,7 @@ pub struct Model {
 
 impl Model {
     pub fn triangles(&self) -> &Vec<Triangle> { &self.triangles }
+    pub fn indices(&self) -> &Vec<u32> { &self.indices }
     pub fn positions(&self) -> &Vec<Vector3<f32>> { &self.positions }
     pub fn tex_coords(&self) -> &Option<Vec<Vector2<f32>>> { &self.tex_coords }
     pub fn normals(&self) -> &Option<Vec<Vector3<f32>>> { &self.normals }
@@ -26,6 +28,9 @@ impl Model {
 
     pub fn set_triangles(&mut self, triangles: Vec<Triangle>) {
         self.triangles = triangles;
+    }
+    pub fn set_indices(&mut self, indices: Vec<u32>) {
+        self.indices = indices;
     }
 
     pub fn build_bvh(&mut self) { self.bvh = Some(BVHBuilder::new(self).build()) }
@@ -96,6 +101,7 @@ impl ModelBuilder {
     pub fn build(self) -> Model {
         let mut bundle_map: HashMap<IndexBundle, u32> = HashMap::new();
         let mut new_triangles: Vec<Triangle> = vec![];
+        let mut new_indices: Vec<u32> = vec![];
         let mut new_positions: Vec<Vector3<f32>> = vec![];
         let mut new_tex_coords: Vec<Vector2<f32>> = vec![];
         let mut new_normals: Vec<Vector3<f32>> = vec![];
@@ -122,6 +128,9 @@ impl ModelBuilder {
                 }
             }).collect::<Vec<u32>>();
             new_triangles.push(Triangle::new(indices[0], indices[1], indices[2], ib_tri.mat_idx));
+            new_indices.push(indices[0]);
+            new_indices.push(indices[1]);
+            new_indices.push(indices[2]);
         });
 
         let mut sorted_materials: Vec<String> = vec![String::new(); self.materials.len()];
@@ -129,6 +138,7 @@ impl ModelBuilder {
 
         Model {
             triangles: new_triangles,
+            indices: new_indices,
             positions: new_positions,
             tex_coords: if has_tex_coords { Some(new_tex_coords) } else { None },
             normals: if has_normals { Some(new_normals) } else { None },

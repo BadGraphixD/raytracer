@@ -1,3 +1,4 @@
+use cgmath::{Matrix4, SquareMatrix};
 use crate::gl_wrapper::buffer::{ShaderStorageBuffer};
 use crate::gl_wrapper::framebuffer::Framebuffer;
 use crate::gl_wrapper::geometry_set::GeometrySetBuilder;
@@ -6,6 +7,7 @@ use crate::gl_wrapper::types::{TextureAttachment, TextureFilter, TextureFormat};
 use crate::rendering::camera::Camera;
 use crate::resource::resource_manager::ResourceManager;
 use rendering::camera_controller::CameraController;
+use crate::gl_wrapper::renderbuffer::Renderbuffer;
 use crate::window::window::Window;
 
 pub mod gl_wrapper;
@@ -30,46 +32,42 @@ fn main() {
     let g_buffer_program = resource_manager.create_shader_program(
         "gBuffer", "rasterize/default.vert", "rasterize/default.frag"
     ).expect("Failed to load shader");
-
     let ray_dispatch_program = resource_manager.create_shader_program(
         "rayDispatch", "util/quad01.vert", "ray_dispatcher.frag"
     ).expect("Failed to load shader");
-
     let ray_trace_program = resource_manager.create_shader_program(
         "rayTrace", "util/quad01.vert", "ray_trace.frag"
     ).expect("Failed to load shader");
-
-    let ray_create_program = resource_manager.create_shader_program("rayCreate", "quad-11.vert", "ray_create.frag").expect("Failed to load shader");
-    let ray_trace_program = resource_manager.create_shader_program("rayTrace", "quad01.vert", "ray_trace_and_shade.frag").expect("Failed to load shader");
-    let display_program = resource_manager.create_shader_program("display", "quad01.vert", "display.frag").expect("Failed to load shader");
-
-    let model_texture1 = resource_manager.get_texture("F16s.bmp").expect("Texture not present");
-    let model_texture2 = resource_manager.get_texture("F16t.bmp").expect("Texture not present");
+    let display_program = resource_manager.create_shader_program(
+        "display", "util/quad01.vert", "util/display.frag"
+    ).expect("Failed to load shader");
 
     // create frame buffers
-    let mut ray_framebuffer = Framebuffer::new();
-    let mut ray_dir_texture = Texture::new(
+    let mut g_buffer = Framebuffer::new();
+    let mut position_tex = Texture::new(
         window.width(), window.height(),
         TextureFormat::RGB32F,
         TextureFilter::Nearest,
     );
-    let mut ray_org_texture = Texture::new(
+    let mut normal_mat_tex = Texture::new(
         window.width(), window.height(),
-        TextureFormat::RGB32F,
+        TextureFormat::RGBA32F,
         TextureFilter::Nearest,
     );
-    ray_framebuffer.attach_texture(&ray_dir_texture, TextureAttachment::Color(0));
-    ray_framebuffer.attach_texture(&ray_org_texture, TextureAttachment::Color(1));
-    ray_framebuffer.bind_draw_buffers();
-
-    let mut col_framebuffer = Framebuffer::new();
-    let mut col_texture = Texture::new(
+    let mut tex_coord_tex = Texture::new(
         window.width(), window.height(),
-        TextureFormat::RGB32F,
+        TextureFormat::RG32F,
         TextureFilter::Nearest,
     );
-    col_framebuffer.attach_texture(&col_texture, TextureAttachment::Color(0));
-    col_framebuffer.bind_draw_buffers();
+    let mut depth_tex = Renderbuffer::new(
+        window.width(), window.height(),
+        TextureFormat::Depth,
+    );
+    g_buffer.attach_renderbuffer(&depth_tex, TextureAttachment::Depth);
+    g_buffer.attach_texture(&position_tex, TextureAttachment::Color(0));
+    g_buffer.attach_texture(&normal_mat_tex, TextureAttachment::Color(1));
+    g_buffer.attach_texture(&tex_coord_tex, TextureAttachment::Color(2));
+    g_buffer.bind_draw_buffers();
 
     // create geometry
     let (quad_geometry, _ibo, _vbo) = GeometrySetBuilder::create_square_geometry();
@@ -87,6 +85,8 @@ fn main() {
     if let Some(model_uvs) = model.lock().unwrap().tex_coords() { tex_coord_ssbo.buffer_data(model_uvs) }
     if let Some(model_normals) = model.lock().unwrap().normals() { normal_ssbo.buffer_data(model_normals) }
 
+    Framebuffer::set_clear_color(0.0, 0.0, 0.0, 0.0);
+
     while !window.should_close() {
         // handle events
         window.handle_events();
@@ -96,53 +96,36 @@ fn main() {
         // update buffers
         if window.resized() {
             unsafe { gl::Viewport(0, 0, window.width() as i32, window.height() as i32) }
-            ray_dir_texture.resize(window.width(), window.height());
-            ray_org_texture.resize(window.width(), window.height());
-            col_texture.resize(window.width(), window.height());
+            position_tex.resize(window.width(), window.height());
+            normal_mat_tex.resize(window.width(), window.height());
+            tex_coord_tex.resize(window.width(), window.height());
+            depth_tex.resize(window.width(), window.height());
         }
 
         let cvv = camera.generate_view_vectors(&window);
         let vp_mat = camera.view_proj_matrices(&window);
 
-        // render objects to g-buffers
+        // clear g-buffer and render
+        g_buffer.bind();
+        Framebuffer::clear_color_depth();
+        Framebuffer::enable_depth_test();
+        {
+            let mut program = g_buffer_program.lock().unwrap();
+            program.bind();
+            program.set_uniform_mat_4f(0, vp_mat.proj * vp_mat.view);
+            program.set_uniform_1i(1, 0);
+        }
+        model_geometry.draw();
 
-
-        // create rays
-        ray_framebuffer.bind();
-        ray_create_program.lock().unwrap().bind();
-        ray_create_program.lock().unwrap().set_uniform_3f(0, cvv.right);
-        ray_create_program.lock().unwrap().set_uniform_3f(1, cvv.up);
-        ray_create_program.lock().unwrap().set_uniform_3f(2, cvv.front);
-        ray_create_program.lock().unwrap().set_uniform_3f(3, cvv.pos);
-        quad_geometry.draw();
-
-        // ray trace
-        col_framebuffer.bind();
-        ray_trace_program.lock().unwrap().bind();
-        ray_trace_program.lock().unwrap().set_uniform_texture(1, ray_dir_texture.bind_to_slot(0));
-        ray_trace_program.lock().unwrap().set_uniform_texture(1, ray_org_texture.bind_to_slot(1));
-
-        // ### if also shade ###
-        ray_trace_program.lock().unwrap().set_uniform_1b(2, model.lock().unwrap().has_tex_coords());
-        ray_trace_program.lock().unwrap().set_uniform_1b(3, model.lock().unwrap().has_normals());
-        ray_trace_program.lock().unwrap().set_uniform_texture_array(4, vec![
-            model_texture1.bind_to_slot(2),
-            model_texture2.bind_to_slot(3),
-        ]);
-        if model.lock().unwrap().has_tex_coords() { tex_coord_ssbo.bind_to_slot(3) }
-        if model.lock().unwrap().has_normals() { normal_ssbo.bind_to_slot(4) }
-        // ###
-
-        node_ssbo.bind_to_slot(0);
-        triangle_ssbo.bind_to_slot(1);
-        position_ssbo.bind_to_slot(2);
-        quad_geometry.draw();
-
-        // render ray data onto screen
-        col_framebuffer.unbind();
-        display_program.lock().unwrap().bind();
-        col_texture.bind_to_slot(0);
-        display_program.lock().unwrap().set_uniform_texture(0, 0);
+        // temp: draw g-buffer pos to screen
+        Framebuffer::bind_default();
+        Framebuffer::disable_depth_test();
+        {
+            let mut program = display_program.lock().unwrap();
+            program.bind();
+            position_tex.bind_to_slot(0);
+            program.set_uniform_texture(0, 0);
+        }
         quad_geometry.draw();
 
         window.update();

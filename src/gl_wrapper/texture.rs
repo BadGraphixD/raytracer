@@ -103,11 +103,7 @@ impl Texture {
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
-        if self.width != width || self.height != height {
-            reformat(self.texture, width, height, &self.format, 0 as *const _);
-            self.width = width;
-            self.height = height;
-        }
+        self.reformat(width, height, self.format.clone());
     }
 
     pub fn change_filter(&mut self, filter: TextureFilter) {
