@@ -50,21 +50,23 @@ fn main() {
     let mut fbo_manager = FramebufferManager::new(window.clone());
 
     let g_buffer = fbo_manager.new_framebuffer();
-    let position_tex = fbo_manager.attach_texture(TextureFormat::RGB32F, TextureAttachment::Color(0));
+    let position_tex = fbo_manager.attach_texture(TextureFormat::RGBA32F, TextureAttachment::Color(0));
     let normal_mat_tex = fbo_manager.attach_texture(TextureFormat::RGBA32F, TextureAttachment::Color(1));
-    let tex_coord_tex = fbo_manager.attach_texture(TextureFormat::RG32F, TextureAttachment::Color(2));
+    let tex_coord_tex = fbo_manager.attach_texture(TextureFormat::RGBA32F, TextureAttachment::Color(2));
     let depth_rbo = fbo_manager.attach_renderbuffer(TextureFormat::Depth, TextureAttachment::Depth);
 
+    /*
     let ray_buffer = fbo_manager.new_framebuffer();
     let shadow_ray_dir_tex = fbo_manager.attach_texture(TextureFormat::RGB32F, TextureAttachment::Color(0));
     let reflect_ray_dir_tex = fbo_manager.attach_texture(TextureFormat::RGB32F, TextureAttachment::Color(1));
     let ambient_ray_dir_tex = fbo_manager.attach_texture(TextureFormat::RGB32F, TextureAttachment::Color(2));
+     */
 
     fbo_manager.build_framebuffers();
 
     // create geometry
     let (quad_geometry, _ibo, _vbo) = GeometrySetBuilder::create_square_geometry();
-    let (model_geometry, _m_ibo, _m_vbo) = GeometrySetBuilder::from_model(model.clone());
+    let (model_geometry, _m_ibo, _m_vbos) = GeometrySetBuilder::from_model(model.clone());
 
     // create buffer with mesh
     let node_ssbo = ShaderStorageBuffer::new();
@@ -78,7 +80,7 @@ fn main() {
     if let Some(model_uvs) = model.lock().unwrap().tex_coords() { tex_coord_ssbo.buffer_data(model_uvs) }
     if let Some(model_normals) = model.lock().unwrap().normals() { normal_ssbo.buffer_data(model_normals) }
 
-    Framebuffer::set_clear_color(0.0, 0.0, 0.0, 0.0);
+    Framebuffer::set_clear_color(0.5, 0.0, 0.5, 0.0);
 
     while !window.lock().unwrap().should_close() {
         // handle events
@@ -97,7 +99,9 @@ fn main() {
 
         // clear g-buffer and render
         fbo_manager.bind_fbo(g_buffer);
+        fbo_manager.build_framebuffers();
         Framebuffer::clear_color_depth();
+        /*
         Framebuffer::enable_depth_test();
         {
             let mut program = g_buffer_program.lock().unwrap();
@@ -106,16 +110,19 @@ fn main() {
             program.set_uniform_1i(1, 0);
         }
         model_geometry.draw();
+         */
 
+        /*
         // create rays
         fbo_manager.bind_fbo(ray_buffer);
         Framebuffer::clear_color();
         Framebuffer::disable_depth_test();
         {
+            let window = window.lock().unwrap();
             let noise_settings = Vector4::new(
                 random::<f32>(), random::<f32>(),
-                window.lock().unwrap().width() as f32 / blue_noise_tex.width() as f32,
-                window.lock().unwrap().height() as f32 / blue_noise_tex.height() as f32,
+                window.width() as f32 / blue_noise_tex.width() as f32,
+                window.height() as f32 / blue_noise_tex.height() as f32,
             );
             let mut program = ray_dispatch_program.lock().unwrap();
             program.bind();
@@ -128,12 +135,15 @@ fn main() {
         }
         quad_geometry.draw();
 
+         */
+
         // temp: draw g-buffer pos to screen
         Framebuffer::bind_default();
+        Framebuffer::disable_depth_test();
         {
             let mut program = display_program.lock().unwrap();
             program.bind();
-            program.set_uniform_texture(0, fbo_manager.bind_tex_to_slot(position_tex, 0));
+            program.set_uniform_texture(0, fbo_manager.bind_tex_to_slot(normal_mat_tex, 0));
         }
         quad_geometry.draw();
 
