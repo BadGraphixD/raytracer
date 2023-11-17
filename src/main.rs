@@ -1,6 +1,4 @@
 use std::sync::{Arc, Mutex};
-use cgmath::{Vector2, Vector3, Vector4};
-use rand::random;
 use crate::gl_wrapper::buffer::{ShaderStorageBuffer};
 use crate::gl_wrapper::framebuffer::Framebuffer;
 use crate::gl_wrapper::geometry_set::GeometrySetBuilder;
@@ -101,7 +99,7 @@ fn main() {
         fbo_manager.bind_fbo(g_buffer);
         fbo_manager.build_framebuffers();
         Framebuffer::clear_color_depth();
-        /*
+
         Framebuffer::enable_depth_test();
         {
             let mut program = g_buffer_program.lock().unwrap();
@@ -110,7 +108,7 @@ fn main() {
             program.set_uniform_1i(1, 0);
         }
         model_geometry.draw();
-         */
+
 
         /*
         // create rays
@@ -143,7 +141,7 @@ fn main() {
         {
             let mut program = display_program.lock().unwrap();
             program.bind();
-            program.set_uniform_texture(0, fbo_manager.bind_tex_to_slot(normal_mat_tex, 0));
+            program.set_uniform_texture(0, fbo_manager.bind_tex_to_slot(position_tex, 0));
         }
         quad_geometry.draw();
 
