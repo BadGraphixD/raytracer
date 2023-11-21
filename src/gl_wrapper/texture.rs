@@ -114,11 +114,12 @@ impl Texture {
     }
 
     pub fn attach_to_framebuffer(&self, attachment: TextureAttachment) {
-        //self.bind(); // todo: check if this is unnecessary
+        self.bind(); // todo: check if this is unnecessary
         unsafe {
-            gl::FramebufferTexture(
+            gl::FramebufferTexture2D(
                 gl::FRAMEBUFFER,
                 attachment.to_gl_internal(),
+                gl::TEXTURE_2D,
                 self.texture,
                 0,
             );

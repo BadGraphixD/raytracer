@@ -46,14 +46,14 @@ impl Framebuffer {
     pub fn enable_depth_test() { unsafe { gl::Enable(gl::DEPTH_TEST) } }
     pub fn disable_depth_test() { unsafe { gl::Disable(gl::DEPTH_TEST) } }
 
-    pub fn attach_texture(&mut self, texture: &Texture, attachment: TextureAttachment) {
+    pub fn attach_texture(&mut self, texture: &Texture, attachment: TextureAttachment, attach: bool) {
         self.bind();
-        self.attach(&attachment);
+        if attach { self.attach(&attachment) }
         texture.attach_to_framebuffer(attachment);
     }
-    pub fn attach_renderbuffer(&mut self, rbo: &Renderbuffer, attachment: TextureAttachment) {
+    pub fn attach_renderbuffer(&mut self, rbo: &Renderbuffer, attachment: TextureAttachment, attach: bool) {
         self.bind();
-        self.attach(&attachment);
+        if attach { self.attach(&attachment) }
         rbo.attach_to_framebuffer(attachment);
     }
     fn attach(&mut self, attachment: &TextureAttachment) {

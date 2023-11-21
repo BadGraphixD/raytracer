@@ -27,18 +27,19 @@ impl FramebufferManager {
         self.framebuffers.len() - 1
     }
 
-    pub fn attach_texture(&mut self, format: TextureFormat, attachment: TextureAttachment) -> usize {
+    pub fn attach_texture(&mut self, format: TextureFormat, attachment: TextureAttachment, attach: bool) -> usize {
         let window = self.window.lock().unwrap();
+        self.framebuffers.last_mut().unwrap().bind();
         let texture = Texture::new(window.width(), window.height(), format, TextureFilter::Nearest);
-        self.framebuffers.last_mut().unwrap().attach_texture(&texture, attachment);
+        self.framebuffers.last_mut().unwrap().attach_texture(&texture, attachment, attach);
         self.textures.push(texture);
         self.textures.len() - 1
     }
 
-    pub fn attach_renderbuffer(&mut self, format: TextureFormat, attachment: TextureAttachment) -> usize {
+    pub fn attach_renderbuffer(&mut self, format: TextureFormat, attachment: TextureAttachment, attach: bool) -> usize {
         let window = self.window.lock().unwrap();
         let rbo = Renderbuffer::new(window.width(), window.height(), format);
-        self.framebuffers.last_mut().unwrap().attach_renderbuffer(&rbo, attachment);
+        self.framebuffers.last_mut().unwrap().attach_renderbuffer(&rbo, attachment, attach);
         self.renderbuffers.push(rbo);
         self.renderbuffers.len() - 1
     }

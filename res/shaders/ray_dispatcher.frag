@@ -23,20 +23,21 @@ layout (std430, binding = 0) buffer matBuffer { Material materials[]; };
 
 void main() {
     vec4 normalMat = texture(normalMatData, fragPos);
-    int materialIdx = floatBitsToInt(normalMat.w);
 
-    if (materialIdx == -1) {
+    if (normalMat.w == 1e30) {
         shadowDir = NO_RAY;
         reflectDir = NO_RAY;
         ambientDir = NO_RAY;
     } else {
         vec3 normal = normalMat.xyz;
+        int materialIdx = floatBitsToInt(normalMat.w);
         vec3 position = texture(positionData, fragPos).xyz;
         vec3 random = texture(blueNoise, fragPos * noiseOffsetScale.zw + noiseOffsetScale.xy).xyz;
         Material material = materials[materialIdx];
 
         shadowDir = normalize(lightPos - position);
-        reflectDir = material.reflect ? reflect(position - cameraPos, normal) : NO_RAY;
-        ambientDir = normal + random * 2 - 1;
+        //reflectDir = material.reflect ? reflect(position - cameraPos, normal) : NO_RAY;
+        reflectDir = reflect(position - cameraPos, normal);
+        ambientDir = random;
     }
 }
