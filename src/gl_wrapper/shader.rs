@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use crate::gl_wrapper::types::ShaderType;
 use crate::util::error::ShaderError;
-use cgmath::{Matrix, Matrix4, Vector3, Vector4};
+use cgmath::{Matrix, Matrix4, Vector2, Vector3, Vector4};
 use gl::types::GLchar;
 use std::ffi::CString;
 use std::sync::Arc;
@@ -141,6 +141,10 @@ impl ShaderProgram {
         unsafe { gl::Uniform1iv(loc, v.len() as i32, v.as_ptr()) }
     }
 
+    pub fn set_uniform_2f(&mut self, loc: i32, v: Vector2<f32>) {
+        unsafe { gl::Uniform2f(loc, v[0], v[1]) }
+    }
+
     pub fn set_uniform_3f(&mut self, loc: i32, v: Vector3<f32>) {
         unsafe { gl::Uniform3f(loc, v[0], v[1], v[2]) }
     }
@@ -155,6 +159,10 @@ impl ShaderProgram {
 
     pub fn set_uniform_1i(&mut self, loc: i32, i: i32) {
         unsafe { gl::Uniform1i(loc, i) }
+    }
+
+    pub fn set_uniform_2i(&mut self, loc: i32, v: Vector2<i32>) {
+        unsafe { gl::Uniform2i(loc, v[0], v[1]) }
     }
 
     pub fn set_uniform_1b(&mut self, loc: i32, b: bool) {

@@ -32,6 +32,7 @@ void main() {
         vec3 normal = normalMat.xyz;
         int materialIdx = floatBitsToInt(normalMat.w);
         vec3 position = texture(positionData, fragPos).xyz;
+        //vec3 random = texelFetch(blueNoise, ivec2((fragPos * noiseOffsetScale.zw + noiseOffsetScale.xy) * 512) % 512, 0).xyz;
         vec3 random = texture(blueNoise, fragPos * noiseOffsetScale.zw + noiseOffsetScale.xy).xyz;
         Material material = materials[materialIdx];
 

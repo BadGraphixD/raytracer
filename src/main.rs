@@ -2,7 +2,7 @@ use std::mem;
 use std::mem::transmute;
 use std::sync::{Arc, Mutex};
 use cgmath::{Vector3, Vector4};
-use rand::random;
+use rand::{random, Rng, thread_rng};
 use crate::gl_wrapper::buffer::{ShaderStorageBuffer};
 use crate::gl_wrapper::framebuffer::Framebuffer;
 use crate::gl_wrapper::geometry_set::GeometrySetBuilder;
@@ -90,8 +90,10 @@ fn main() {
 
         // update buffers
         if window.lock().unwrap().resized() {
-            let window = window.lock().unwrap();
-            unsafe { gl::Viewport(0, 0, window.width() as i32, window.height() as i32) }
+            unsafe {
+                let window = window.lock().unwrap();
+                gl::Viewport(0, 0, window.width() as i32, window.height() as i32)
+            }
             fbo_manager.update_buffers();
         }
 
@@ -116,7 +118,8 @@ fn main() {
         {
             let window = window.lock().unwrap();
             let noise_settings = Vector4::new(
-                random::<f32>(), random::<f32>(),
+                thread_rng().gen_range(0..blue_noise_tex.width()) as f32/ blue_noise_tex.width() as f32,
+                thread_rng().gen_range(0..blue_noise_tex.height()) as f32 / blue_noise_tex.height() as f32,
                 window.width() as f32 / blue_noise_tex.width() as f32,
                 window.height() as f32 / blue_noise_tex.height() as f32,
             );
