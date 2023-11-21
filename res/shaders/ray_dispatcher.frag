@@ -1,12 +1,14 @@
 #version 460 core
 
 #define NO_RAY vec3(0, 0, 0)
+#define RAY_ORG_OFFSET 0.001
 
 in vec2 fragPos;
 
-layout (location = 0) out vec3 shadowDir;
-layout (location = 1) out vec3 reflectDir;
-layout (location = 2) out vec3 ambientDir;
+layout (location = 0) out vec3 org;
+layout (location = 1) out vec3 shadowDir;
+layout (location = 2) out vec3 reflectDir;
+layout (location = 3) out vec3 ambientDir;
 
 struct Material {
     bool reflect;
@@ -23,22 +25,18 @@ layout (std430, binding = 0) buffer matBuffer { Material materials[]; };
 
 void main() {
     vec4 normalMat = texture(normalMatData, fragPos);
+    if (normalMat.w == 1e30) discard;
 
-    if (normalMat.w == 1e30) {
-        shadowDir = NO_RAY;
-        reflectDir = NO_RAY;
-        ambientDir = NO_RAY;
-    } else {
-        vec3 normal = normalMat.xyz;
-        int materialIdx = floatBitsToInt(normalMat.w);
-        vec3 position = texture(positionData, fragPos).xyz;
-        //vec3 random = texelFetch(blueNoise, ivec2((fragPos * noiseOffsetScale.zw + noiseOffsetScale.xy) * 512) % 512, 0).xyz;
-        vec3 random = texture(blueNoise, fragPos * noiseOffsetScale.zw + noiseOffsetScale.xy).xyz;
-        Material material = materials[materialIdx];
+    vec3 normal = normalMat.xyz;
+    int materialIdx = floatBitsToInt(normalMat.w);
+    vec3 position = texture(positionData, fragPos).xyz;
+    //vec3 random = texelFetch(blueNoise, ivec2((fragPos * noiseOffsetScale.zw + noiseOffsetScale.xy) * 512) % 512, 0).xyz;
+    vec3 random = texture(blueNoise, fragPos * noiseOffsetScale.zw + noiseOffsetScale.xy).xyz;
+    Material material = materials[materialIdx];
 
-        shadowDir = normalize(lightPos - position);
-        //reflectDir = material.reflect ? reflect(position - cameraPos, normal) : NO_RAY;
-        reflectDir = reflect(position - cameraPos, normal);
-        ambientDir = random;
-    }
+    org = position + normal * RAY_ORG_OFFSET;
+    shadowDir = normalize(lightPos - position);
+    //reflectDir = material.reflect ? reflect(position - cameraPos, normal) : NO_RAY;
+    reflectDir = reflect(position - cameraPos, normal);
+    ambientDir = normal + random * 2 - 1;
 }

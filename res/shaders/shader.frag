@@ -45,7 +45,7 @@ layout (location = 9) uniform vec3 lightPos;
 layout (location = 10) uniform vec3 cameraPos;
 
 layout (std430, binding = 0) buffer triangleBuffer { Triangle triangles[]; };
-layout (std430, binding = 1) buffer texCoordBuffer { float triPositions[]; };
+layout (std430, binding = 1) buffer positionBuffer { float triPositions[]; };
 layout (std430, binding = 2) buffer texCoordBuffer { float triTexCoords[]; };
 layout (std430, binding = 3) buffer normalBuffer { float triNormals[]; };
 

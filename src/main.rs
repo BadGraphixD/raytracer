@@ -1,8 +1,6 @@
-use std::mem;
-use std::mem::transmute;
 use std::sync::{Arc, Mutex};
 use cgmath::{Vector3, Vector4};
-use rand::{random, Rng, thread_rng};
+use rand::{Rng, thread_rng};
 use crate::gl_wrapper::buffer::{ShaderStorageBuffer};
 use crate::gl_wrapper::framebuffer::Framebuffer;
 use crate::gl_wrapper::geometry_set::GeometrySetBuilder;
@@ -29,7 +27,7 @@ fn main() {
     // load resources
     let mut resource_manager = ResourceManager::new("res/models", "res/textures", "res/shaders").expect("Failed to create resource manager");
 
-    let model = resource_manager.get_model("f16.obj").expect("Failed to load model resources");
+    let model = resource_manager.get_model("dragon.obj").expect("Failed to load model resources");
     model.lock().unwrap().build_bvh();
 
     let g_buffer_program = resource_manager.create_shader_program(
@@ -56,12 +54,22 @@ fn main() {
     let position_tex = fbo_manager.attach_texture(TextureFormat::RGB32F, TextureAttachment::Color(0), true);
     let normal_mat_tex = fbo_manager.attach_texture(TextureFormat::RGBA32F, TextureAttachment::Color(1), true);
     let tex_coord_tex = fbo_manager.attach_texture(TextureFormat::RG32F, TextureAttachment::Color(2), true);
-    let depth_rbo = fbo_manager.attach_renderbuffer(TextureFormat::Depth, TextureAttachment::Depth, false);
+    let _depth_rbo = fbo_manager.attach_renderbuffer(TextureFormat::Depth, TextureAttachment::Depth, false);
 
     let ray_buffer = fbo_manager.new_framebuffer();
-    let shadow_ray_dir_tex = fbo_manager.attach_texture(TextureFormat::RGB32F, TextureAttachment::Color(0), true);
-    let reflect_ray_dir_tex = fbo_manager.attach_texture(TextureFormat::RGB32F, TextureAttachment::Color(1), true);
-    let ambient_ray_dir_tex = fbo_manager.attach_texture(TextureFormat::RGB32F, TextureAttachment::Color(2), true);
+    let ray_org_tex = fbo_manager.attach_texture(TextureFormat::RGB32F, TextureAttachment::Color(0), true);
+    let shadow_ray_dir_tex = fbo_manager.attach_texture(TextureFormat::RGB32F, TextureAttachment::Color(1), true);
+    let reflect_ray_dir_tex = fbo_manager.attach_texture(TextureFormat::RGB32F, TextureAttachment::Color(2), true);
+    let ambient_ray_dir_tex = fbo_manager.attach_texture(TextureFormat::RGB32F, TextureAttachment::Color(3), true);
+
+    let shadow_intersection_buffer = fbo_manager.new_framebuffer();
+    let shadow_intersection_tex = fbo_manager.attach_texture(TextureFormat::RGBA32F, TextureAttachment::Color(0), true);
+
+    let reflect_intersection_buffer = fbo_manager.new_framebuffer();
+    let reflect_intersection_tex = fbo_manager.attach_texture(TextureFormat::RGBA32F, TextureAttachment::Color(0), true);
+
+    let ambient_intersection_buffer = fbo_manager.new_framebuffer();
+    let ambient_intersection_tex = fbo_manager.attach_texture(TextureFormat::RGBA32F, TextureAttachment::Color(0), true);
 
     fbo_manager.build_framebuffers();
 
@@ -81,12 +89,12 @@ fn main() {
     if let Some(model_uvs) = model.lock().unwrap().tex_coords() { tex_coord_ssbo.buffer_data(model_uvs) }
     if let Some(model_normals) = model.lock().unwrap().normals() { normal_ssbo.buffer_data(model_normals) }
 
-    Framebuffer::set_clear_color(0.0, 0.0, 0.0, 1e30);
-
     while !window.lock().unwrap().should_close() {
         // handle events
         window.lock().unwrap().handle_events();
         camera_controller.control(&mut camera);
+
+        println!("FPS: {}", (1.0 / window.lock().unwrap().dt()) as u32);
 
         // update buffers
         if window.lock().unwrap().resized() {
@@ -102,6 +110,7 @@ fn main() {
 
         // clear g-buffer and render
         fbo_manager.bind_fbo(g_buffer);
+        Framebuffer::set_clear_color(0.0, 0.0, 0.0, 1e30); // materialIdx is set to 1e30 (code for "no material")
         Framebuffer::clear_color_depth();
         Framebuffer::enable_depth_test();
         {
@@ -111,10 +120,12 @@ fn main() {
             program.set_uniform_1i(1, 0);
         }
         model_geometry.draw();
+        Framebuffer::disable_depth_test();
 
         // create rays
         fbo_manager.bind_fbo(ray_buffer);
-        Framebuffer::disable_depth_test();
+        Framebuffer::set_clear_color(0.0, 0.0, 0.0, 0.0); // ray org and dir is set to NO_RAY (=vec3(0, 0, 0))
+        Framebuffer::clear_color();
         {
             let window = window.lock().unwrap();
             let noise_settings = Vector4::new(
@@ -134,13 +145,38 @@ fn main() {
         }
         quad_geometry.draw();
 
+        // trace rays
+        Framebuffer::set_clear_color(1e30, 0.0, 0.0, 0.0); // t-value of Intersection is set to MISS (=1e30)
+        node_ssbo.bind_to_slot(0);
+        triangle_ssbo.bind_to_slot(1);
+        position_ssbo.bind_to_slot(2);
+        {
+            let mut program = ray_trace_program.lock().unwrap();
+            program.bind();
+            program.set_uniform_texture(1, fbo_manager.bind_tex_to_slot(ray_org_tex, 1));
+
+            fbo_manager.bind_fbo(shadow_intersection_buffer);
+            Framebuffer::clear_color();
+            program.set_uniform_texture(0, fbo_manager.bind_tex_to_slot(shadow_ray_dir_tex, 0));
+            quad_geometry.draw();
+
+            fbo_manager.bind_fbo(reflect_intersection_buffer);
+            Framebuffer::clear_color();
+            program.set_uniform_texture(0, fbo_manager.bind_tex_to_slot(reflect_ray_dir_tex, 0));
+            quad_geometry.draw();
+
+            fbo_manager.bind_fbo(ambient_intersection_buffer);
+            Framebuffer::clear_color();
+            program.set_uniform_texture(0, fbo_manager.bind_tex_to_slot(ambient_ray_dir_tex, 0));
+            quad_geometry.draw();
+        }
+
         // temp: draw g-buffer pos to screen
         Framebuffer::bind_default();
-        Framebuffer::disable_depth_test();
         {
             let mut program = display_program.lock().unwrap();
             program.bind();
-            program.set_uniform_texture(0, fbo_manager.bind_tex_to_slot(ambient_ray_dir_tex, 0));
+            program.set_uniform_texture(0, fbo_manager.bind_tex_to_slot(normal_mat_tex, 0));
             program.set_uniform_texture(0, 0);
         }
         quad_geometry.draw();
