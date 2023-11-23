@@ -8,6 +8,7 @@
 #endif
 
 #define MISS 1e30
+#define NO_MATERIAL 1e30
 
 const vec3 SUN_DIR = normalize(vec3(1, 2, 1));
 const vec3 SUN_COL = vec3(1, 0.97, 0.86);
@@ -123,9 +124,21 @@ vec3 getColor(const vec3 dir, const Intersection i) {
 }
 
 void main() {
+    // fetch parameters
     vec3 position = texture(position, fragPos).xyz;
-    vec4 normalMat = texture(normalMat, fragPos).xyzw;
     vec2 texCoord = texture(texCoord, fragPos).xy;
+    vec3 normal;
+    int materialIdx;
+    {
+        vec4 normalMat = texture(normalMat, fragPos).xyzw;
+        normal = normalMat.xyz;
+        float material = normalMat.w;
+        if (material == NO_MATERIAL) {
+            color = vec4(.2, .5, .8, 1);
+            return;
+        }
+        materialIdx = floatBitsToInt(normalMat.w);
+    }
 
     vec3 viewDir = texture(viewDir, fragPos).xyz;
 
@@ -133,11 +146,20 @@ void main() {
     vec3 reflectDir = texture(reflectDir, fragPos).xyz;
     vec3 ambientDir = texture(ambientDir, fragPos).xyz;
 
-    float distToLight = distance(position, lightPos);
+    Intersection shadowHit = toIntersection(texture(shadowHits, fragPos));
+    Intersection reflectHit = toIntersection(texture(reflectHits, fragPos));
+    Intersection ambientHit = toIntersection(texture(ambientHits, fragPos));
 
-    bool shadow = texture(shadowHits, fragPos).x >= distToLight;
-    vec3 reflectColor = getColor(reflectDir, toIntersection(texture(reflectHits, fragPos)));
-    vec3 ambientColor = getColor(reflectDir, toIntersection(texture(ambientHits, fragPos)));
+    // calculate necessary values
+    vec3 vecToLight = lightPos - position;
+    vec3 dirToLight = normalize(vecToLight);
+    float distToLight = length(vecToLight);
+    bool shadow = shadowHit.t < distToLight;
 
-    color = vec4(ambientDir, 1);
+    float diffuse = clamp(shadow ? 0.0 : dot(normal, dirToLight), 0.0, 1.0) * 0.8;
+    float specular = clamp(shadow ? 0.0 : pow(dot(reflectDir, dirToLight), 30.0), 0.0, 1.0) * 0.5;
+    float ambient = ambientHit.t == MISS ? 0.2 : 0.0;
+
+    //color = vec4((reflectDir * 0.5 + ambientDir * 0.5) * (shadow ? 0.2 : 1), 1);
+    color = vec4((diffuse + specular + ambient).xxx, 1);
 }

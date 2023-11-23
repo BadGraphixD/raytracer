@@ -1,7 +1,7 @@
 #version 460 core
 
 #define NO_RAY vec3(0, 0, 0)
-#define RAY_ORG_OFFSET 0.001
+#define RAY_ORG_OFFSET 0.0001
 
 in vec2 fragPos;
 
@@ -37,6 +37,6 @@ void main() {
     org = position + normal * RAY_ORG_OFFSET;
     shadowDir = normalize(lightPos - position);
     //reflectDir = material.reflect ? reflect(position - cameraPos, normal) : NO_RAY;
-    reflectDir = reflect(position - cameraPos, normal);
-    ambientDir = normal + random * 2 - 1;
+    reflectDir = normalize(reflect(position - cameraPos, normal));
+    ambientDir = normalize(normal + random * 2 - 1);
 }

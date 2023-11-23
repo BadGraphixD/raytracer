@@ -141,6 +141,10 @@ impl ShaderProgram {
         unsafe { gl::Uniform1iv(loc, v.len() as i32, v.as_ptr()) }
     }
 
+    pub fn set_uniform_1f(&mut self, loc: i32, f: f32) {
+        unsafe { gl::Uniform1f(loc, f) }
+    }
+
     pub fn set_uniform_2f(&mut self, loc: i32, v: Vector2<f32>) {
         unsafe { gl::Uniform2f(loc, v[0], v[1]) }
     }

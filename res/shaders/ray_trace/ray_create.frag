@@ -4,11 +4,10 @@ in vec2 fragPos;
 
 layout (location = 0) out vec3 dir;
 
-layout (location = 0) uniform vec3 right;
-layout (location = 1) uniform vec3 up;
-layout (location = 2) uniform vec3 front;
-layout (location = 3) uniform vec3 position;
+layout (location = 0) uniform mat4 invProjView;
+layout (location = 1) uniform float near;
+layout (location = 2) uniform float far;
 
 void main() {
-    dir = normalize(right * fragPos.x + up * fragPos.y + front);
+    dir = normalize((invProjView * (vec4(fragPos, 1, 1) * far - vec4(fragPos, -1, 1) * near)).xyz);
 }

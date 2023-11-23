@@ -3,6 +3,9 @@ use cgmath::{Angle, Deg, InnerSpace, Matrix4, perspective, Point3, Rad, Vector3}
 use std::ops::{Add, Div, Mul};
 use std::sync::{Arc, Mutex};
 
+const NEAR: f32 = 0.01;
+const FAR: f32 = 1000.0;
+
 pub struct Camera {
     window: Arc<Mutex<Window>>,
     fov: Rad<f32>,
@@ -73,19 +76,22 @@ impl Camera {
         let window = self.window.lock().unwrap();
         CameraViewProjMatrices {
             view: Matrix4::look_at_rh(self.position, self.position.add(self.direction), self.up),
-            proj: perspective(self.fov, window.aspect(), 0.01, 1000.0),
+            proj: perspective(self.fov, window.aspect(), NEAR, FAR),
+            near: NEAR, far: FAR,
         }
     }
 }
 
 pub struct CameraViewVectors {
-    pub right: Vector3<f32>,
-    pub up: Vector3<f32>,
-    pub front: Vector3<f32>,
-    pub pos: Vector3<f32>,
+    pub right: Vector3<f32>, // deprecated
+    pub up: Vector3<f32>, // deprecated
+    pub front: Vector3<f32>, // deprecated
+    pub pos: Vector3<f32>, // todo: move out of struct
 }
 
 pub struct CameraViewProjMatrices {
     pub view: Matrix4<f32>,
     pub proj: Matrix4<f32>,
+    pub near: f32,
+    pub far: f32,
 }

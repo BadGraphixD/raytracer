@@ -1,5 +1,5 @@
 use std::sync::{Arc, Mutex};
-use cgmath::{Vector3, Vector4};
+use cgmath::{SquareMatrix, Vector3, Vector4};
 use rand::{Rng, thread_rng};
 use crate::gl_wrapper::buffer::{ShaderStorageBuffer};
 use crate::gl_wrapper::framebuffer::Framebuffer;
@@ -34,7 +34,7 @@ fn main() {
         "gBuffer", "rasterize/default.vert", "rasterize/default.frag"
     ).expect("Failed to load shader");
     let ray_dir_create_program = resource_manager.create_shader_program(
-        "rayDirCreate", "util/quad01.vert", "ray_trace/ray_create.frag"
+        "rayDirCreate", "util/quad-11.vert", "ray_trace/ray_create.frag"
     ).expect("Failed to load shader");
     let ray_dispatch_program = resource_manager.create_shader_program(
         "rayDispatch", "util/quad01.vert", "ray_trace/ray_dispatcher.frag"
@@ -101,10 +101,13 @@ fn main() {
     if let Some(model_uvs) = model.lock().unwrap().tex_coords() { tex_coord_ssbo.buffer_data(model_uvs) }
     if let Some(model_normals) = model.lock().unwrap().normals() { normal_ssbo.buffer_data(model_normals) }
 
+    let mut time = 0.0;
     while !window.lock().unwrap().should_close() {
         // handle events
         window.lock().unwrap().handle_events();
         camera_controller.control(&mut camera);
+
+        time += window.lock().unwrap().dt();
 
         println!("FPS: {}", (1.0 / window.lock().unwrap().dt()) as u32);
 
@@ -120,7 +123,7 @@ fn main() {
         let cvv = camera.generate_view_vectors();
         let vp_mat = camera.view_proj_matrices();
 
-        let light_pos = Vector3::new(5.0, 10.0, 5.0);
+        let light_pos = Vector3::new(time.sin() * 20.0, 20.0, time.cos() * 20.0);
 
         // clear g-buffer and render
         fbo_manager.bind_fbo(g_buffer);
@@ -143,10 +146,9 @@ fn main() {
         {
             let mut program = ray_dir_create_program.lock().unwrap();
             program.bind();
-            program.set_uniform_3f(0, cvv.right);
-            program.set_uniform_3f(1, cvv.up);
-            program.set_uniform_3f(2, cvv.front);
-            program.set_uniform_3f(3, cvv.pos);
+            program.set_uniform_mat_4f(0, (vp_mat.proj * vp_mat.view).invert().unwrap());
+            program.set_uniform_1f(1, vp_mat.near);
+            program.set_uniform_1f(2, vp_mat.far);
         }
         quad_geometry.draw();
 
@@ -214,12 +216,12 @@ fn main() {
             program.set_uniform_texture(1, fbo_manager.bind_tex_to_slot(normal_mat_tex, 1));
             program.set_uniform_texture(2, fbo_manager.bind_tex_to_slot(tex_coord_tex, 2));
             program.set_uniform_texture(3, fbo_manager.bind_tex_to_slot(ray_dir_tex, 3));
-            program.set_uniform_texture(4, fbo_manager.bind_tex_to_slot(shadow_ray_dir_tex, 3));
-            program.set_uniform_texture(5, fbo_manager.bind_tex_to_slot(shadow_intersection_tex, 4));
-            program.set_uniform_texture(6, fbo_manager.bind_tex_to_slot(reflect_ray_dir_tex, 5));
-            program.set_uniform_texture(7, fbo_manager.bind_tex_to_slot(reflect_intersection_tex, 6));
-            program.set_uniform_texture(8, fbo_manager.bind_tex_to_slot(ambient_ray_dir_tex, 7));
-            program.set_uniform_texture(9, fbo_manager.bind_tex_to_slot(ambient_intersection_tex, 8));
+            program.set_uniform_texture(4, fbo_manager.bind_tex_to_slot(shadow_ray_dir_tex, 4));
+            program.set_uniform_texture(5, fbo_manager.bind_tex_to_slot(shadow_intersection_tex, 5));
+            program.set_uniform_texture(6, fbo_manager.bind_tex_to_slot(reflect_ray_dir_tex, 6));
+            program.set_uniform_texture(7, fbo_manager.bind_tex_to_slot(reflect_intersection_tex, 7));
+            program.set_uniform_texture(8, fbo_manager.bind_tex_to_slot(ambient_ray_dir_tex, 8));
+            program.set_uniform_texture(9, fbo_manager.bind_tex_to_slot(ambient_intersection_tex, 9));
             program.set_uniform_3f(10, light_pos);
             program.set_uniform_3f(11, cvv.pos);
             program.set_uniform_1b(12, model.lock().unwrap().has_normals());
