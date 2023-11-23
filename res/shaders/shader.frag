@@ -9,13 +9,15 @@
 
 #define MISS 1e30
 
+const vec3 SUN_DIR = normalize(vec3(1, 2, 1));
+const vec3 SUN_COL = vec3(1, 0.97, 0.86);
 #define TOP_SKY vec3(0.5, 0.7, 0.9)
 #define BOTTOM_SKY vec3(0.2, 0.5, 0.8)
 
 #define DEFAULT_AMBIENT vec3(0.3)
 #define DEFAULT_DIFFUSE vec3(1.0)
 #define DEFAULT_SPECULAR vec3(1.0)
-#define DEFAULT_SPEC_EXP 30.0
+#define DEFAULT_SPEC_EXP 30.00
 
 in vec2 fragPos;
 layout (location = 0) out vec4 color;
@@ -34,15 +36,20 @@ layout (location = 0) uniform sampler2D position;
 layout (location = 1) uniform sampler2D normalMat;
 layout (location = 2) uniform sampler2D texCoord;
 
-layout (location = 3) uniform sampler2D shadowDir;
-layout (location = 4) uniform sampler2D shadowHits;
-layout (location = 5) uniform sampler2D reflectDir;
-layout (location = 6) uniform sampler2D reflectHits;
-layout (location = 7) uniform sampler2D ambientDir;
-layout (location = 8) uniform sampler2D ambientHits;
+layout (location = 3) uniform sampler2D viewDir;
 
-layout (location = 9) uniform vec3 lightPos;
-layout (location = 10) uniform vec3 cameraPos;
+layout (location = 4) uniform sampler2D shadowDir;
+layout (location = 5) uniform sampler2D shadowHits;
+layout (location = 6) uniform sampler2D reflectDir;
+layout (location = 7) uniform sampler2D reflectHits;
+layout (location = 8) uniform sampler2D ambientDir;
+layout (location = 9) uniform sampler2D ambientHits;
+
+layout (location = 10) uniform vec3 lightPos;
+layout (location = 11) uniform vec3 cameraPos;
+
+layout (location = 12) uniform bool hasNormalBuffer;
+layout (location = 13) uniform bool hasTexCoordBuffer;
 
 layout (std430, binding = 0) buffer triangleBuffer { Triangle triangles[]; };
 layout (std430, binding = 1) buffer positionBuffer { float triPositions[]; };
@@ -73,7 +80,7 @@ vec3 fetchNormal(uint index) {
 }
 
 vec2 triangleTexCoord(const uint idx, const vec2 uv) {
-    if (hasTexCoords) {
+    if (hasTexCoordBuffer) {
         vec2 t0 = fetchTexCoord(triangles[idx].p0);
         vec2 t1 = fetchTexCoord(triangles[idx].p1);
         vec2 t2 = fetchTexCoord(triangles[idx].p2);
@@ -85,7 +92,7 @@ vec2 triangleTexCoord(const uint idx, const vec2 uv) {
 }
 
 vec3 triangleNormal(const uint idx, const vec2 uv) {
-    if (hasNormals) {
+    if (hasNormalBuffer) {
         vec3 n0 = fetchNormal(triangles[idx].p0);
         vec3 n1 = fetchNormal(triangles[idx].p1);
         vec3 n2 = fetchNormal(triangles[idx].p2);
@@ -120,11 +127,17 @@ void main() {
     vec4 normalMat = texture(normalMat, fragPos).xyzw;
     vec2 texCoord = texture(texCoord, fragPos).xy;
 
+    vec3 viewDir = texture(viewDir, fragPos).xyz;
+
+    vec3 shadowDir = texture(shadowDir, fragPos).xyz;
+    vec3 reflectDir = texture(reflectDir, fragPos).xyz;
+    vec3 ambientDir = texture(ambientDir, fragPos).xyz;
+
     float distToLight = distance(position, lightPos);
 
     bool shadow = texture(shadowHits, fragPos).x >= distToLight;
-    vec3 reflectColor = getColor(texture(reflectDir, fragPos).xyz, toIntersection(texture(reflectHits, fragPos)));
-    vec3 ambientColor = getColor(texture(ambientDir, fragPos).xyz, toIntersection(texture(ambientHits, fragPos)));
+    vec3 reflectColor = getColor(reflectDir, toIntersection(texture(reflectHits, fragPos)));
+    vec3 ambientColor = getColor(reflectDir, toIntersection(texture(ambientHits, fragPos)));
 
-    // todo: mix and so on...
+    color = vec4(ambientDir, 1);
 }

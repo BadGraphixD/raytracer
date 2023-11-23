@@ -27,17 +27,23 @@ fn main() {
     // load resources
     let mut resource_manager = ResourceManager::new("res/models", "res/textures", "res/shaders").expect("Failed to create resource manager");
 
-    let model = resource_manager.get_model("dragon.obj").expect("Failed to load model resources");
+    let model = resource_manager.get_model("f16.obj").expect("Failed to load model resources");
     model.lock().unwrap().build_bvh();
 
     let g_buffer_program = resource_manager.create_shader_program(
         "gBuffer", "rasterize/default.vert", "rasterize/default.frag"
     ).expect("Failed to load shader");
+    let ray_dir_create_program = resource_manager.create_shader_program(
+        "rayDirCreate", "util/quad01.vert", "ray_trace/ray_create.frag"
+    ).expect("Failed to load shader");
     let ray_dispatch_program = resource_manager.create_shader_program(
-        "rayDispatch", "util/quad01.vert", "ray_dispatcher.frag"
+        "rayDispatch", "util/quad01.vert", "ray_trace/ray_dispatcher.frag"
     ).expect("Failed to load shader");
     let ray_trace_program = resource_manager.create_shader_program(
-        "rayTrace", "util/quad01.vert", "ray_trace.frag"
+        "rayTrace", "util/quad01.vert", "ray_trace/ray_trace.frag"
+    ).expect("Failed to load shader");
+    let shader_program = resource_manager.create_shader_program(
+        "shader", "util/quad01.vert", "shader.frag"
     ).expect("Failed to load shader");
     let display_program = resource_manager.create_shader_program(
         "display", "util/quad01.vert", "util/display.frag"
@@ -56,6 +62,9 @@ fn main() {
     let tex_coord_tex = fbo_manager.attach_texture(TextureFormat::RG32F, TextureAttachment::Color(2), true);
     let _depth_rbo = fbo_manager.attach_renderbuffer(TextureFormat::Depth, TextureAttachment::Depth, false);
 
+    let ray_dir_buffer = fbo_manager.new_framebuffer();
+    let ray_dir_tex = fbo_manager.attach_texture(TextureFormat::RGB32F, TextureAttachment::Color(0), true);
+
     let ray_buffer = fbo_manager.new_framebuffer();
     let ray_org_tex = fbo_manager.attach_texture(TextureFormat::RGB32F, TextureAttachment::Color(0), true);
     let shadow_ray_dir_tex = fbo_manager.attach_texture(TextureFormat::RGB32F, TextureAttachment::Color(1), true);
@@ -70,6 +79,9 @@ fn main() {
 
     let ambient_intersection_buffer = fbo_manager.new_framebuffer();
     let ambient_intersection_tex = fbo_manager.attach_texture(TextureFormat::RGBA32F, TextureAttachment::Color(0), true);
+
+    let color_buffer = fbo_manager.new_framebuffer();
+    let color_tex = fbo_manager.attach_texture(TextureFormat::RGBA32F, TextureAttachment::Color(0), true);
 
     fbo_manager.build_framebuffers();
 
@@ -108,6 +120,8 @@ fn main() {
         let cvv = camera.generate_view_vectors();
         let vp_mat = camera.view_proj_matrices();
 
+        let light_pos = Vector3::new(5.0, 10.0, 5.0);
+
         // clear g-buffer and render
         fbo_manager.bind_fbo(g_buffer);
         Framebuffer::set_clear_color(0.0, 0.0, 0.0, 1e30); // materialIdx is set to 1e30 (code for "no material")
@@ -123,6 +137,20 @@ fn main() {
         Framebuffer::disable_depth_test();
 
         // create rays
+        fbo_manager.bind_fbo(ray_dir_buffer);
+        Framebuffer::set_clear_color(0.0, 0.0, 0.0, 0.0); // ray dir is vec3(0, 0, 0) by default
+        Framebuffer::clear_color();
+        {
+            let mut program = ray_dir_create_program.lock().unwrap();
+            program.bind();
+            program.set_uniform_3f(0, cvv.right);
+            program.set_uniform_3f(1, cvv.up);
+            program.set_uniform_3f(2, cvv.front);
+            program.set_uniform_3f(3, cvv.pos);
+        }
+        quad_geometry.draw();
+
+        // dispatch rays
         fbo_manager.bind_fbo(ray_buffer);
         Framebuffer::set_clear_color(0.0, 0.0, 0.0, 0.0); // ray org and dir is set to NO_RAY (=vec3(0, 0, 0))
         Framebuffer::clear_color();
@@ -139,7 +167,7 @@ fn main() {
             program.set_uniform_texture(0, fbo_manager.bind_tex_to_slot(position_tex, 0));
             program.set_uniform_texture(1, fbo_manager.bind_tex_to_slot(normal_mat_tex, 1));
             program.set_uniform_texture(2, blue_noise_tex.bind_to_slot(2));
-            program.set_uniform_3f(3, Vector3::new(5.0, 10.0, 5.0));
+            program.set_uniform_3f(3, light_pos);
             program.set_uniform_3f(4, cvv.pos);
             program.set_uniform_4f(5, noise_settings);
         }
@@ -171,12 +199,40 @@ fn main() {
             quad_geometry.draw();
         }
 
-        // temp: draw g-buffer pos to screen
+        // shade
+        fbo_manager.bind_fbo(color_buffer);
+        Framebuffer::set_clear_color(0.0, 0.0, 0.0, 0.0);
+        Framebuffer::clear_color();
+        triangle_ssbo.bind_to_slot(0);
+        position_ssbo.bind_to_slot(1);
+        tex_coord_ssbo.bind_to_slot(2);
+        normal_ssbo.bind_to_slot(3);
+        {
+            let mut program = shader_program.lock().unwrap();
+            program.bind();
+            program.set_uniform_texture(0, fbo_manager.bind_tex_to_slot(position_tex, 0));
+            program.set_uniform_texture(1, fbo_manager.bind_tex_to_slot(normal_mat_tex, 1));
+            program.set_uniform_texture(2, fbo_manager.bind_tex_to_slot(tex_coord_tex, 2));
+            program.set_uniform_texture(3, fbo_manager.bind_tex_to_slot(ray_dir_tex, 3));
+            program.set_uniform_texture(4, fbo_manager.bind_tex_to_slot(shadow_ray_dir_tex, 3));
+            program.set_uniform_texture(5, fbo_manager.bind_tex_to_slot(shadow_intersection_tex, 4));
+            program.set_uniform_texture(6, fbo_manager.bind_tex_to_slot(reflect_ray_dir_tex, 5));
+            program.set_uniform_texture(7, fbo_manager.bind_tex_to_slot(reflect_intersection_tex, 6));
+            program.set_uniform_texture(8, fbo_manager.bind_tex_to_slot(ambient_ray_dir_tex, 7));
+            program.set_uniform_texture(9, fbo_manager.bind_tex_to_slot(ambient_intersection_tex, 8));
+            program.set_uniform_3f(10, light_pos);
+            program.set_uniform_3f(11, cvv.pos);
+            program.set_uniform_1b(12, model.lock().unwrap().has_normals());
+            program.set_uniform_1b(13, model.lock().unwrap().has_tex_coords());
+        }
+        quad_geometry.draw();
+
+        // temp: draw any buffer to screen
         Framebuffer::bind_default();
         {
             let mut program = display_program.lock().unwrap();
             program.bind();
-            program.set_uniform_texture(0, fbo_manager.bind_tex_to_slot(normal_mat_tex, 0));
+            program.set_uniform_texture(0, fbo_manager.bind_tex_to_slot(color_tex, 0));
             program.set_uniform_texture(0, 0);
         }
         quad_geometry.draw();
